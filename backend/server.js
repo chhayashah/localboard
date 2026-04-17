@@ -97,7 +97,7 @@ io.on("connection", (socket) => {
 app.use(errorHandler);
 
 // 404 handler
-app.use("*", (req, res) => {
+app.use((req, res) => {
   res
     .status(404)
     .json({ success: false, message: `Route ${req.originalUrl} not found` });
