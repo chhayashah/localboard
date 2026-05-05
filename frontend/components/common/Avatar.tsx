@@ -1,12 +1,7 @@
 import React from "react";
-import { View, Text, Image, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Image, StyleSheet, Text, View } from "react-native";
+import { getAvatarColor, getInitials } from "../../constants/helpers";
 import { COLORS } from "../../constants/theme";
-import {
-  getInitials,
-  getAvatarColor,
-  getRoleConfig,
-} from "../../constants/helpers";
 
 interface Props {
   user: any;
@@ -14,54 +9,54 @@ interface Props {
   showBadge?: boolean;
 }
 
-export default function Avatar({ user, size = 40, showBadge = true }: Props) {
-  if (!user) return null;
-  const rc = getRoleConfig(user.role);
-  const bSz = size * 0.38;
+export default function Avatar({ user, size = 36, showBadge = false }: Props) {
+  const initials = getInitials(user?.name || "?");
+  const bgColor = getAvatarColor(user?.name || "");
+  const radius = size * 0.3;
+  const badgeSize = size * 0.32;
 
   return (
     <View style={{ width: size, height: size }}>
-      {user.avatar ? (
+      {user?.avatar ? (
         <Image
           source={{ uri: user.avatar }}
-          style={{ width: size, height: size, borderRadius: size / 2 }}
+          style={{ width: size, height: size, borderRadius: radius }}
         />
       ) : (
         <View
           style={[
-            styles.placeholder,
+            styles.fallback,
             {
               width: size,
               height: size,
-              borderRadius: size / 2,
-              backgroundColor: getAvatarColor(user.name),
+              borderRadius: radius,
+              backgroundColor: bgColor + "28",
+              borderColor: bgColor + "60",
             },
           ]}
         >
           <Text
-            style={{ color: "#fff", fontWeight: "700", fontSize: size * 0.38 }}
+            style={[styles.initials, { fontSize: size * 0.35, color: bgColor }]}
           >
-            {getInitials(user.name)}
+            {initials}
           </Text>
         </View>
       )}
-      {showBadge && (user.isVerified || user.role !== "user") && (
+
+      {showBadge && user?.isVerified && (
         <View
           style={[
             styles.badge,
             {
-              width: bSz,
-              height: bSz,
-              borderRadius: bSz / 2,
-              backgroundColor: rc.color,
+              width: badgeSize,
+              height: badgeSize,
+              borderRadius: badgeSize / 2,
+              bottom: -1,
+              right: -1,
             },
           ]}
         >
-          <Ionicons
-            name={user.isVerified ? "checkmark" : (rc.icon as any)}
-            size={bSz * 0.6}
-            color="#fff"
-          />
+          <Text style={{ fontSize: badgeSize * 0.65 }}>✓</Text>
         </View>
       )}
     </View>
@@ -69,14 +64,18 @@ export default function Avatar({ user, size = 40, showBadge = true }: Props) {
 }
 
 const styles = StyleSheet.create({
-  placeholder: { justifyContent: "center", alignItems: "center" },
-  badge: {
-    position: "absolute",
-    bottom: -1,
-    right: -1,
+  fallback: {
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1.5,
-    borderColor: COLORS.bgCard,
+  },
+  initials: { fontWeight: "800" },
+  badge: {
+    position: "absolute",
+    backgroundColor: COLORS.success,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: COLORS.bg,
   },
 });

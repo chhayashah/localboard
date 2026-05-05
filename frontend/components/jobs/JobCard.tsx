@@ -1,18 +1,10 @@
-import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Linking,
-  Alert,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS, SIZES } from "../../constants/theme";
+import React from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { timeAgo } from "../../constants/helpers";
-import Avatar from "../common/Avatar";
+import { COLORS, SIZES } from "../../constants/theme";
 
-const ICONS: Record<string, string> = {
+const CAT_ICONS: Record<string, string> = {
   delivery: "🛵",
   cook: "👨‍🍳",
   cleaner: "🧹",
@@ -27,102 +19,61 @@ const ICONS: Record<string, string> = {
 };
 
 export default function JobCard({ job, onPress }: any) {
-  const call = () => Linking.openURL(`tel:${job.contactPhone}`);
-  const whatsapp = () => {
-    const msg = encodeURIComponent(
-      `Hi! Maine LocalBoard pe "${job.title}" job dekhi.`,
-    );
-    Linking.openURL(
-      `https://wa.me/91${job.whatsapp || job.contactPhone}?text=${msg}`,
-    );
-  };
+  const icon = CAT_ICONS[job.category] || "🔧";
+  const isUrgent =
+    Date.now() - new Date(job.createdAt).getTime() < 24 * 60 * 60 * 1000;
 
   return (
     <TouchableOpacity
       style={styles.card}
       onPress={onPress}
-      activeOpacity={0.85}
+      activeOpacity={0.88}
     >
       <View style={styles.header}>
         <View style={styles.iconBox}>
-          <Text style={{ fontSize: 22 }}>{ICONS[job.category] || "🔧"}</Text>
+          <Text style={{ fontSize: 22 }}>{icon}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={styles.title} numberOfLines={2}>
             {job.title}
           </Text>
-          <Text style={styles.meta}>
-            📍 {job.location.ward}, {job.location.city} ·{" "}
-            {timeAgo(job.createdAt)}
+          <Text style={styles.biz}>
+            {job.postedBy?.name} · {job.location?.ward}
           </Text>
         </View>
-        <View style={styles.freeBadge}>
-          <Text style={styles.freeText}>FREE</Text>
-        </View>
+        {job.salary?.amount > 0 && (
+          <Text style={styles.salary}>
+            ₹{job.salary.amount.toLocaleString("hi-IN")}/
+            {job.salary.period === "monthly"
+              ? "mo"
+              : job.salary.period === "daily"
+                ? "day"
+                : "hr"}
+          </Text>
+        )}
       </View>
 
-      <Text style={styles.desc} numberOfLines={2}>
-        {job.description}
-      </Text>
-
-      {!!job.salary?.amount && (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 5,
-            marginBottom: 8,
-          }}
-        >
-          <Ionicons name="cash-outline" size={14} color={COLORS.success} />
-          <Text
-            style={{ fontSize: 13, color: COLORS.success, fontWeight: "600" }}
-          >
-            ₹{job.salary.amount.toLocaleString("hi-IN")}/{job.salary.period}
-            {job.salary.negotiable ? " (Negotiable)" : ""}
-          </Text>
-        </View>
+      {!!job.description && (
+        <Text style={styles.desc} numberOfLines={2}>
+          {job.description}
+        </Text>
       )}
 
-      <View style={styles.divider} />
-
       <View style={styles.footer}>
-        <View
-          style={{
-            flex: 1,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <Avatar user={job.postedBy} size={24} showBadge={false} />
-          <Text style={{ fontSize: 12, color: COLORS.textMuted }}>
-            {job.postedBy?.name}
-          </Text>
+        {isUrgent && (
+          <View style={styles.urgentBadge}>
+            <View style={styles.urgentDot} />
+            <Text style={styles.urgentText}>Urgent</Text>
+          </View>
+        )}
+        <Ionicons name="location-outline" size={11} color={COLORS.textMuted} />
+        <Text style={styles.dist}>
+          {job.location?.ward}, {job.location?.city}
+        </Text>
+        <Text style={styles.time}>{timeAgo(job.createdAt)}</Text>
+        <View style={styles.applyBtn}>
+          <Text style={styles.applyText}>Apply →</Text>
         </View>
-        <TouchableOpacity
-          style={[
-            styles.btn,
-            { borderColor: "#25D36644", backgroundColor: "#25D36610" },
-          ]}
-          onPress={whatsapp}
-        >
-          <Ionicons name="logo-whatsapp" size={15} color="#25D366" />
-          <Text style={[styles.btnText, { color: "#25D366" }]}>WhatsApp</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.btn,
-            {
-              borderColor: COLORS.primary + "44",
-              backgroundColor: COLORS.primary + "10",
-            },
-          ]}
-          onPress={call}
-        >
-          <Ionicons name="call" size={15} color={COLORS.primary} />
-          <Text style={[styles.btnText, { color: COLORS.primary }]}>Call</Text>
-        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -131,58 +82,82 @@ export default function JobCard({ job, onPress }: any) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.bgCard,
-    borderRadius: SIZES.radiusLg,
+    borderRadius: SIZES.radiusMd,
     padding: SIZES.md,
-    marginBottom: 10,
     borderWidth: 1,
     borderColor: COLORS.border,
+    marginBottom: 10,
   },
   header: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 10,
+    alignItems: "flex-start",
+    gap: 11,
+    marginBottom: 8,
   },
   iconBox: {
     width: 44,
     height: 44,
     borderRadius: SIZES.radiusMd,
-    backgroundColor: COLORS.bgElevated,
+    backgroundColor: COLORS.bgInput,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    flexShrink: 0,
   },
   title: {
-    fontSize: SIZES.bodyLg,
+    fontSize: SIZES.body,
     fontWeight: "700",
     color: COLORS.textPrimary,
-    marginBottom: 3,
+    lineHeight: 19,
+    marginBottom: 2,
   },
-  meta: { fontSize: 12, color: COLORS.textMuted },
-  freeBadge: {
-    backgroundColor: COLORS.success + "22",
-    borderColor: COLORS.success + "44",
-    borderWidth: 1,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: SIZES.radiusFull,
-  },
-  freeText: { color: COLORS.success, fontSize: 10, fontWeight: "700" },
-  desc: {
+  biz: { fontSize: SIZES.caption, color: COLORS.textMuted },
+  salary: {
     fontSize: SIZES.body,
-    color: COLORS.textSecondary,
-    lineHeight: 20,
-    marginBottom: 8,
+    fontWeight: "800",
+    color: COLORS.primary,
+    flexShrink: 0,
   },
-  divider: { height: 1, backgroundColor: COLORS.border, marginBottom: 10 },
-  footer: { flexDirection: "row", alignItems: "center", gap: 8 },
-  btn: {
+  desc: {
+    fontSize: SIZES.caption,
+    color: COLORS.textSecondary,
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    flexWrap: "wrap",
+  },
+  urgentBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: COLORS.error + "15",
     borderRadius: SIZES.radiusFull,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderWidth: 1,
+    borderColor: COLORS.error + "30",
   },
-  btnText: { fontSize: 12, fontWeight: "600" },
+  urgentDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: COLORS.error,
+  },
+  urgentText: { fontSize: 10, color: COLORS.error, fontWeight: "700" },
+  dist: { fontSize: 10, color: COLORS.textMuted, flex: 1 },
+  time: { fontSize: 10, color: COLORS.textMuted },
+  applyBtn: {
+    backgroundColor: COLORS.primary + "18",
+    borderRadius: SIZES.radiusFull,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: COLORS.primary + "35",
+  },
+  applyText: { fontSize: 11, color: COLORS.primary, fontWeight: "700" },
 });

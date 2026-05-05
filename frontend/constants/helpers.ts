@@ -1,62 +1,76 @@
-import { ROLE_CONFIG } from './theme';
+import { COLORS } from "./theme";
 
 export const timeAgo = (date: string | Date): string => {
-  const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
-  if (seconds < 60) return 'abhi';
-  const m = Math.floor(seconds / 60);   if (m < 60)  return `${m}m`;
-  const h = Math.floor(m / 60);         if (h < 24)  return `${h}h`;
-  const d = Math.floor(h / 24);         if (d < 7)   return `${d}d`;
-  return new Date(date).toLocaleDateString('hi-IN', { day: 'numeric', month: 'short' });
+  const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  if (diff < 60) return "abhi abhi";
+  if (diff < 3600) return `${Math.floor(diff / 60)} min pehle`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} ghante pehle`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)} din pehle`;
+  return new Date(date).toLocaleDateString("hi-IN");
 };
 
-export const formatCount = (num: number): string => {
-  if (!num) return '0';
-  if (num >= 10000000) return (num / 10000000).toFixed(1) + ' Cr';
-  if (num >= 100000)   return (num / 100000).toFixed(1) + ' L';
-  if (num >= 1000)     return (num / 1000).toFixed(1) + 'K';
-  return String(num);
+export const formatCount = (n: number): string => {
+  if (!n) return "0";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toString();
 };
 
-export const getRoleConfig = (role: string) => ROLE_CONFIG[role] || ROLE_CONFIG.user;
+const AVATAR_COLORS = [
+  "#F5A623",
+  "#FF6B2B",
+  "#22C55E",
+  "#38BDF8",
+  "#A855F7",
+  "#EF4444",
+  "#16A085",
+  "#D35400",
+];
 
-export const getInitials = (name = '') =>
-  name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase();
+export const getInitials = (name: string): string => {
+  if (!name) return "?";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
 
-export const getAvatarColor = (name = ''): string => {
-  const colors = ['#FF6B2B','#3B82F6','#10B981','#7C3AED','#F59E0B','#EF4444','#EC4899','#06B6D4'];
+export const getAvatarColor = (name: string): string => {
+  if (!name) return AVATAR_COLORS[0];
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return colors[Math.abs(hash) % colors.length];
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 };
 
-export const isValidPhone = (phone: string): boolean => /^[6-9]\d{9}$/.test(phone);
+export type UserRole = "user" | "reporter" | "mla" | "parshad" | "opposition";
 
-export const parseContent = (text: string) => {
-  if (!text) return [];
-  const parts: { type: string; value: string }[] = [];
-  const regex = /(#\w+|@\w+)/g;
-  let lastIndex = 0, match;
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex)
-      parts.push({ type: 'text', value: text.slice(lastIndex, match.index) });
-    parts.push({ type: match[0].startsWith('#') ? 'hashtag' : 'mention', value: match[0] });
-    lastIndex = match.index + match[0].length;
-  }
-  if (lastIndex < text.length) parts.push({ type: 'text', value: text.slice(lastIndex) });
-  return parts;
+export const getRoleConfig = (role: string) => {
+  const configs: Record<string, any> = {
+    reporter: { label: "Reporter", color: COLORS.roleReporter, emoji: "📰" },
+    mla: { label: "MLA", color: COLORS.roleMla, emoji: "🏛️" },
+    parshad: { label: "Parshad", color: COLORS.roleParshad, emoji: "🏛️" },
+    opposition: { label: "Vipaksh", color: COLORS.roleOpposition, emoji: "⚖️" },
+    user: { label: "Creator", color: COLORS.roleUser, emoji: "✦" },
+  };
+  return configs[role] || configs.user;
 };
+
+export const isValidPhone = (p: string) => /^[6-9]\d{9}$/.test(p);
+export const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 export const JOB_CATEGORIES = [
-  { value: 'all',          label: 'Sab Jobs' },
-  { value: 'delivery',     label: '🛵 Delivery' },
-  { value: 'cook',         label: '👨‍🍳 Cook/Khana' },
-  { value: 'cleaner',      label: '🧹 Safai' },
-  { value: 'security',     label: '💂 Security' },
-  { value: 'driver',       label: '🚗 Driver' },
-  { value: 'teaching',     label: '📚 Teaching' },
-  { value: 'medical',      label: '🏥 Medical' },
-  { value: 'retail',       label: '🛒 Dukan' },
-  { value: 'construction', label: '🏗️ Construction' },
-  { value: 'tech',         label: '💻 Tech' },
-  { value: 'other',        label: '🔧 Other' },
+  { value: "all", label: "Sabhi" },
+  { value: "delivery", label: "🛵 Delivery" },
+  { value: "cook", label: "👨‍🍳 Cook" },
+  { value: "cleaner", label: "🧹 Cleaner" },
+  { value: "security", label: "💂 Security" },
+  { value: "driver", label: "🚗 Driver" },
+  { value: "teaching", label: "📚 Teaching" },
+  { value: "medical", label: "🏥 Medical" },
+  { value: "retail", label: "🛒 Retail" },
+  { value: "tech", label: "💻 Tech" },
+  { value: "other", label: "🔧 Other" },
 ];
+
+export const truncate = (text: string, len: number) =>
+  text.length > len ? text.slice(0, len) + "..." : text;

@@ -1,13 +1,11 @@
-import { useEffect } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import { View, ActivityIndicator } from "react-native";
-import { AuthProvider, useAuth } from "../hooks/useAuth";
+import { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
 import { COLORS } from "../constants/theme";
+import { AuthProvider, useAuth } from "../hooks/useAuth";
 
-function NavGuard() {
+function RootLayoutNav() {
   const { isAuthenticated, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -34,16 +32,22 @@ function NavGuard() {
     );
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: COLORS.bg },
+        animation: "slide_from_right",
+      }}
+    >
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="auth/login" />
       <Stack.Screen name="auth/signup" />
       <Stack.Screen name="post/[id]" />
       <Stack.Screen name="profile/[id]" />
-      <Stack.Screen name="profile/edit" options={{ presentation: "modal" }} />
-      <Stack.Screen name="create" options={{ presentation: "modal" }} />
+      <Stack.Screen name="profile/edit" />
       <Stack.Screen name="jobs/[id]" />
-      <Stack.Screen name="jobs/create" options={{ presentation: "modal" }} />
+      <Stack.Screen name="jobs/create" />
+      <Stack.Screen name="create" />
       <Stack.Screen name="notifications" />
     </Stack>
   );
@@ -51,13 +55,9 @@ function NavGuard() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <StatusBar style="light" backgroundColor={COLORS.bg} />
-          <NavGuard />
-        </AuthProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <AuthProvider>
+      <StatusBar style="light" backgroundColor={COLORS.bg} />
+      <RootLayoutNav />
+    </AuthProvider>
   );
 }

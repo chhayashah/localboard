@@ -1,30 +1,31 @@
-// app/create.tsx
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Image,
-  ActivityIndicator,
-  Alert,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { COLORS, SIZES } from "../constants/theme";
-import { postsAPI } from "../services/api";
-import { useAuth } from "../hooks/useAuth";
 import Avatar from "../components/common/Avatar";
-import RoleBadge from "../components/common/RoleBadge";
+import { COLORS, SIZES } from "../constants/theme";
+import { useAuth } from "../hooks/useAuth";
+import { postsAPI } from "../services/api";
 
-const TYPES = [
-  { value: "post", label: "📝 Post", roles: null },
-  { value: "news", label: "📰 News", roles: ["reporter", "mla", "parshad"] },
-  { value: "update", label: "🏛️ Update", roles: ["mla", "parshad"] },
+const POST_TYPES = [
+  { k: "post", label: "📝 Post" },
+  { k: "reel", label: "🎬 Reel" },
+  { k: "news", label: "📰 News" },
+  { k: "update", label: "🏛️ Update" },
 ];
 
 export default function CreateScreen() {
@@ -32,36 +33,31 @@ export default function CreateScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [content, setContent] = useState("");
-  const [media, setMedia] = useState<any>(null);
   const [type, setType] = useState("post");
+  const [media, setMedia] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-
-  const available = TYPES.filter(
-    (t) => !t.roles || t.roles.includes(user?.role || ""),
-  );
 
   const pickMedia = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") return;
-    const r = await ImagePicker.launchImageLibraryAsync({
+    if (status !== "granted") return Alert.alert("Permission denied");
+    const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
-      quality: 0.8,
+      allowsEditing: true,
+      quality: 0.85,
     });
-    if (!r.canceled) {
-      setMedia(r.assets[0]);
-      if (r.assets[0].type === "video") setType("reel");
+    if (!res.canceled) {
+      setMedia(res.assets[0]);
+      if (res.assets[0].type === "video") setType("reel");
     }
   };
 
   const handlePost = async () => {
-    if (!content.trim() && !media) {
-      Alert.alert("Empty", "Kuch likhein ya media add karein");
-      return;
-    }
+    if (!content.trim() && !media)
+      return Alert.alert("Required", "Kuch likhein ya media add karein");
     setLoading(true);
     try {
       const fd = new FormData();
-      fd.append("content", content);
+      fd.append("content", content.trim());
       fd.append("type", type);
       if (media) {
         const ext = media.uri.split(".").pop();
@@ -72,7 +68,11 @@ export default function CreateScreen() {
         } as any);
       }
       const res: any = await postsAPI.createPost(fd);
-      if (res.success) router.back();
+      if (res.success) {
+        Alert.alert("✅ Post ho gaya!", "", [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+      }
     } catch (e: any) {
       Alert.alert("Error", e.message);
     } finally {
@@ -80,225 +80,279 @@ export default function CreateScreen() {
     }
   };
 
+  const canPost = ["news", "update"].includes(type)
+    ? ["reporter", "mla", "parshad", "opposition"].includes(user?.role)
+    : true;
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1, backgroundColor: COLORS.bg }}
+    >
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="close" size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Naya Post</Text>
+        <Text style={styles.headerTitle}>Naya Post</Text>
         <TouchableOpacity
-          style={[
-            styles.btn,
-            ((!content.trim() && !media) || loading) && styles.btnOff,
-          ]}
+          style={[styles.postBtn, (!canPost || loading) && { opacity: 0.4 }]}
           onPress={handlePost}
-          disabled={(!content.trim() && !media) || loading}
+          disabled={!canPost || loading}
         >
           {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color="#000" />
           ) : (
-            <Text style={styles.btnText}>Share</Text>
+            <Text style={styles.postBtnText}>Post Karo →</Text>
           )}
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-            padding: SIZES.md,
-          }}
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Type selector */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.typesRow}
         >
-          <Avatar user={user} size={44} />
-          <View>
-            <Text
-              style={{
-                fontSize: SIZES.bodyLg,
-                fontWeight: "700",
-                color: COLORS.textPrimary,
-              }}
-            >
-              {user?.name}
-            </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-                marginTop: 3,
-              }}
-            >
-              <RoleBadge role={user?.role || "user"} />
-              <Text style={{ fontSize: 12, color: COLORS.textMuted }}>
-                📍 {user?.location?.ward}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 8,
-            paddingHorizontal: SIZES.md,
-            marginBottom: 8,
-          }}
-        >
-          {available.map((t) => (
-            <TouchableOpacity
-              key={t.value}
-              style={[
-                styles.typeChip,
-                type === t.value && styles.typeChipActive,
-              ]}
-              onPress={() => setType(t.value)}
-            >
-              <Text
+          {POST_TYPES.map((t) => {
+            const needsRole = ["news", "update"].includes(t.k);
+            const allowed = needsRole
+              ? ["reporter", "mla", "parshad", "opposition"].includes(
+                  user?.role,
+                )
+              : true;
+            return (
+              <TouchableOpacity
+                key={t.k}
                 style={[
-                  styles.typeText,
-                  type === t.value && { color: "#fff", fontWeight: "700" },
+                  styles.typeChip,
+                  type === t.k && styles.typeChipOn,
+                  !allowed && { opacity: 0.35 },
                 ]}
+                onPress={() => allowed && setType(t.k)}
+                disabled={!allowed}
               >
-                {t.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[styles.typeText, type === t.k && styles.typeTextOn]}
+                >
+                  {t.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {!canPost && (
+          <View style={styles.roleWarn}>
+            <Ionicons
+              name="lock-closed-outline"
+              size={14}
+              color={COLORS.warning}
+            />
+            <Text style={styles.roleWarnText}>
+              Yeh type sirf reporters aur leaders ke liye hai
+            </Text>
+          </View>
+        )}
+
+        {/* User row + textarea */}
+        <View style={styles.inputRow}>
+          <Avatar user={user} size={40} showBadge />
+          <TextInput
+            style={styles.textarea}
+            placeholder="Kya ho raha hai apne ward mein? Share karo..."
+            placeholderTextColor={COLORS.textMuted}
+            value={content}
+            onChangeText={setContent}
+            multiline
+            maxLength={1000}
+            autoFocus
+          />
         </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Kya ho raha hai aapke ward mein? #hashtag @mention"
-          placeholderTextColor={COLORS.textMuted}
-          multiline
-          value={content}
-          onChangeText={setContent}
-          autoFocus
-          maxLength={1000}
-        />
+        {/* Location tag */}
+        <View style={styles.locTag}>
+          <Ionicons name="location" size={13} color={COLORS.primary} />
+          <Text style={styles.locText}>
+            {user?.location?.ward}, {user?.location?.city}
+          </Text>
+        </View>
 
-        <Text
-          style={{
-            textAlign: "right",
-            paddingRight: SIZES.md,
-            fontSize: 11,
-            color: content.length > 1000 ? COLORS.error : COLORS.textMuted,
-          }}
-        >
-          {content.length}/1000
-        </Text>
-
-        {media && (
-          <View
-            style={{
-              margin: SIZES.md,
-              borderRadius: SIZES.radiusMd,
-              overflow: "hidden",
-            }}
-          >
+        {/* Media Preview / Add */}
+        {media ? (
+          <View style={styles.mediaPreview}>
             <Image
               source={{ uri: media.uri }}
-              style={{ width: "100%", height: 200, resizeMode: "cover" }}
+              style={styles.previewImg}
+              resizeMode="cover"
             />
             <TouchableOpacity
               style={styles.removeMedia}
               onPress={() => setMedia(null)}
             >
-              <Ionicons name="close-circle" size={24} color={COLORS.error} />
+              <Ionicons name="close-circle" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
-        )}
-      </ScrollView>
-
-      <View style={[styles.toolbar, { paddingBottom: insets.bottom + 8 }]}>
-        {[
-          { icon: "image-outline", label: "Gallery", onPress: pickMedia },
-          {
-            icon: "pricetag-outline",
-            label: "Hashtag",
-            onPress: () => setContent((c) => c + " #"),
-          },
-          {
-            icon: "at",
-            label: "Mention",
-            onPress: () => setContent((c) => c + " @"),
-          },
-        ].map((b, i) => (
-          <TouchableOpacity
-            key={i}
-            style={{ alignItems: "center", gap: 3 }}
-            onPress={b.onPress}
-          >
-            <Ionicons
-              name={b.icon as any}
-              size={24}
-              color={COLORS.textSecondary}
-            />
-            <Text style={{ fontSize: 10, color: COLORS.textMuted }}>
-              {b.label}
-            </Text>
+        ) : (
+          <TouchableOpacity style={styles.mediaAdd} onPress={pickMedia}>
+            <Ionicons name="image-outline" size={28} color={COLORS.textMuted} />
+            <Text style={styles.mediaAddText}>Photo ya Video add karo</Text>
           </TouchableOpacity>
-        ))}
-      </View>
-    </View>
+        )}
+
+        {/* Toolbar */}
+        <View style={styles.toolbar}>
+          {[
+            { icon: "image-outline", label: "Photo", onPress: pickMedia },
+            { icon: "videocam-outline", label: "Video", onPress: pickMedia },
+            { icon: "location-outline", label: "Location", onPress: () => {} },
+            {
+              icon: "at-outline",
+              label: "Mention",
+              onPress: () => setContent((c) => c + "@"),
+            },
+            {
+              icon: "pricetag-outline",
+              label: "Tag",
+              onPress: () => setContent((c) => c + "#"),
+            },
+          ].map((t) => (
+            <TouchableOpacity
+              key={t.label}
+              style={styles.toolBtn}
+              onPress={t.onPress}
+            >
+              <Ionicons
+                name={t.icon as any}
+                size={20}
+                color={COLORS.textMuted}
+              />
+              <Text style={styles.toolLabel}>{t.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.charCount}>{content.length}/1000</Text>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: SIZES.screenPadding,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  title: {
-    fontSize: SIZES.title,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  btn: {
+  headerTitle: { fontSize: 17, fontWeight: "700", color: COLORS.textPrimary },
+  postBtn: {
     backgroundColor: COLORS.primary,
-    borderRadius: SIZES.radiusFull,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 8,
+    borderRadius: 20,
   },
-  btnOff: { opacity: 0.4 },
-  btnText: { color: "#fff", fontWeight: "700" },
+  postBtnText: { fontSize: 13, fontWeight: "800", color: "#000" },
+  typesRow: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   typeChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: SIZES.radiusFull,
-    backgroundColor: COLORS.bgCard,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.border,
+    backgroundColor: COLORS.bgCard,
   },
-  typeChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+  typeChipOn: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  typeText: { fontSize: 12, fontWeight: "700", color: COLORS.textMuted },
+  typeTextOn: { color: "#000" },
+  roleWarn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginHorizontal: 14,
+    padding: 10,
+    backgroundColor: COLORS.warning + "12",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.warning + "30",
+    marginBottom: 8,
   },
-  typeText: { fontSize: 12, color: COLORS.textSecondary },
-  input: {
-    fontSize: SIZES.bodyLg,
+  roleWarnText: { fontSize: 12, color: COLORS.warning, flex: 1 },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  textarea: {
+    flex: 1,
+    fontSize: 15,
     color: COLORS.textPrimary,
-    paddingHorizontal: SIZES.md,
-    paddingVertical: 8,
-    minHeight: 120,
-    textAlignVertical: "top",
-    lineHeight: 24,
+    lineHeight: 22,
+    minHeight: 100,
   },
+  locTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginHorizontal: 14,
+    marginBottom: 12,
+    backgroundColor: COLORS.primary + "10",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: COLORS.primary + "25",
+    alignSelf: "flex-start",
+  },
+  locText: { fontSize: 12, color: COLORS.primary, fontWeight: "700" },
+  mediaPreview: {
+    marginHorizontal: 14,
+    borderRadius: 14,
+    overflow: "hidden",
+    height: 200,
+    position: "relative",
+    marginBottom: 12,
+  },
+  previewImg: { width: "100%", height: "100%" },
   removeMedia: { position: "absolute", top: 8, right: 8 },
+  mediaAdd: {
+    marginHorizontal: 14,
+    height: 120,
+    backgroundColor: COLORS.bgInput,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: COLORS.primary + "30",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 12,
+  },
+  mediaAddText: { fontSize: 13, color: COLORS.textMuted, fontWeight: "600" },
   toolbar: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    paddingTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    backgroundColor: COLORS.bgCard,
+    gap: 4,
+  },
+  toolBtn: { flex: 1, alignItems: "center", gap: 3, padding: 6 },
+  toolLabel: { fontSize: 9, color: COLORS.textMuted, fontWeight: "700" },
+  charCount: {
+    textAlign: "right",
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    fontSize: 11,
+    color: COLORS.textMuted,
   },
 });

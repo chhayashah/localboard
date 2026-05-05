@@ -1,12 +1,25 @@
-import { Tabs } from "expo-router";
-import { View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS, SIZES } from "../../constants/theme";
+import { Tabs } from "expo-router";
+import { StyleSheet, Text, View } from "react-native";
+import { COLORS } from "../../constants/theme";
 
-function Icon({ name, focused, color }: any) {
+function TabIcon({ name, focused, label }: any) {
   return (
-    <View style={[styles.iconWrap, focused && styles.iconActive]}>
-      <Ionicons name={name} size={focused ? 24 : 22} color={color} />
+    <View style={styles.tabItem}>
+      <Ionicons
+        name={focused ? name : `${name}-outline`}
+        size={22}
+        color={focused ? COLORS.primary : COLORS.textMuted}
+      />
+      <Text
+        style={[
+          styles.tabLabel,
+          { color: focused ? COLORS.primary : COLORS.textMuted },
+        ]}
+      >
+        {label}
+      </Text>
+      {focused && <View style={styles.tabDot} />}
     </View>
   );
 }
@@ -16,57 +29,53 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textMuted,
+        tabBarStyle: {
+          backgroundColor: COLORS.bgCard,
+          borderTopColor: COLORS.border,
+          borderTopWidth: 1,
+          height: 62,
+          paddingBottom: 8,
+        },
         tabBarShowLabel: false,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ focused, color }) => (
-            <Icon
-              name={focused ? "home" : "home-outline"}
-              focused={focused}
-              color={color}
-            />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="home" focused={focused} label="Home" />
           ),
         }}
       />
       <Tabs.Screen
         name="reels"
         options={{
-          tabBarIcon: ({ focused, color }) => (
-            <Icon
-              name={focused ? "play-circle" : "play-circle-outline"}
-              focused={focused}
-              color={color}
-            />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="play-circle" focused={focused} label="Reels" />
           ),
         }}
       />
       <Tabs.Screen
         name="jobs"
         options={{
-          tabBarIcon: ({ focused, color }) => (
-            <Icon
-              name={focused ? "briefcase" : "briefcase-outline"}
-              focused={focused}
-              color={color}
-            />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="briefcase" focused={focused} label="Jobs" />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="compass" focused={focused} label="Explore" />
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarIcon: ({ focused, color }) => (
-            <Icon
-              name={focused ? "person" : "person-outline"}
-              focused={focused}
-              color={color}
-            />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="person-circle" focused={focused} label="Me" />
           ),
         }}
       />
@@ -75,18 +84,18 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: COLORS.bgCard,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    height: 60,
+  tabItem: { alignItems: "center", gap: 2, paddingTop: 6 },
+  tabLabel: {
+    fontSize: 8,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  iconWrap: {
-    width: 44,
-    height: 36,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: SIZES.radiusMd,
+  tabDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: COLORS.primary,
+    marginTop: 1,
   },
-  iconActive: { backgroundColor: COLORS.primary + "18" },
 });

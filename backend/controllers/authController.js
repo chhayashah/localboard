@@ -2,160 +2,118 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const OTP = require("../models/OTP");
 
-// Generate JWT
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+const generateToken = (id) =>
+  jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || "30d",
   });
-};
 
-// Generate 6-digit OTP
-const generateOTP = () => {
-  if (process.env.MOCK_OTP === "true") {
-    return process.env.MOCK_OTP_CODE || "123456";
-  }
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
-
-// @desc    Send OTP to phone
-// @route   POST /api/auth/send-otp
-// @access  Public
 const sendOTP = async (req, res) => {
   try {
     const { phone } = req.body;
-
-    if (!phone || !/^[6-9]\d{9}$/.test(phone)) {
+    if (!phone)
       return res
         .status(400)
-        .json({
-          success: false,
-          message: "Valid Indian phone number required",
-        });
-    }
+        .json({ success: false, message: "Phone or email required" });
 
-    // Delete existing OTPs for this phone
+    const isEmail = phone.includes("@");
+    if (!isEmail && !/^[6-9]\d{9}$/.test(phone))
+      return res
+        .status(400)
+        .json({ success: false, message: "Valid Indian phone required" });
+
     await OTP.deleteMany({ phone });
 
-    const otp = generateOTP();
+    const otp =
+      process.env.MOCK_OTP === "true"
+        ? process.env.MOCK_OTP_CODE || "123456"
+        : Math.floor(100000 + Math.random() * 900000).toString();
 
     await OTP.create({ phone, otp });
-
-    // In production, integrate SMS service like MSG91, Fast2SMS etc.
-    // For now, we mock it
     console.log(`📱 OTP for ${phone}: ${otp}`);
 
-    res.status(200).json({
+    if (isEmail && process.env.MOCK_OTP !== "true") {
+      const { sendOTPEmail } = require("../utils/emailService");
+      await sendOTPEmail(phone, otp);
+    }
+
+    res.json({
       success: true,
-      message: "OTP sent successfully",
-      // ONLY in development/mock mode - remove in production
+      message: "OTP sent",
       ...(process.env.MOCK_OTP === "true" && { otp }),
     });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
   }
 };
 
-// @desc    Verify OTP and signup/login
-// @route   POST /api/auth/verify-otp
-// @access  Public
 const verifyOTP = async (req, res) => {
   try {
     const { phone, otp } = req.body;
-
-    if (!phone || !otp) {
+    if (!phone || !otp)
       return res
         .status(400)
         .json({ success: false, message: "Phone and OTP required" });
-    }
 
-    const otpRecord = await OTP.findOne({ phone, otp });
-
-    if (!otpRecord) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid or expired OTP" });
-    }
-
-    if (otpRecord.expiresAt < new Date()) {
-      await OTP.deleteOne({ _id: otpRecord._id });
+    const record = await OTP.findOne({ phone, otp });
+    if (!record)
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
+    if (record.expiresAt < new Date()) {
+      await OTP.deleteOne({ _id: record._id });
       return res.status(400).json({ success: false, message: "OTP expired" });
     }
 
-    await OTP.deleteOne({ _id: otpRecord._id });
+    await OTP.deleteOne({ _id: record._id });
 
-    // Check if user exists
-    const existingUser = await User.findOne({ phone });
-
-    if (existingUser) {
-      // Login
-      const token = generateToken(existingUser._id);
-      return res.status(200).json({
+    const existing = await User.findOne({ phone });
+    if (existing) {
+      const token = generateToken(existing._id);
+      return res.json({
         success: true,
         isNewUser: false,
         token,
-        user: existingUser,
+        user: existing,
       });
     }
 
-    // New user - phone verified, needs profile setup
-    res.status(200).json({
+    res.json({
       success: true,
       isNewUser: true,
       phone,
-      message: "OTP verified. Please complete your profile.",
+      message: "OTP verified. Complete profile.",
     });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
   }
 };
 
-// @desc    Complete signup - create profile
-// @route   POST /api/auth/signup
-// @access  Public (after OTP verification)
 const signup = async (req, res) => {
   try {
     const { phone, name, city, ward, pincode, role } = req.body;
-
-    if (!phone || !name || !city || !ward || !pincode) {
+    if (!phone || !name || !city || !ward || !pincode)
       return res
         .status(400)
-        .json({ success: false, message: "All fields are required" });
-    }
+        .json({ success: false, message: "All fields required" });
 
-    const existingUser = await User.findOne({ phone });
-    if (existingUser) {
+    if (await User.findOne({ phone }))
       return res
         .status(400)
         .json({ success: false, message: "User already exists" });
-    }
 
-    const allowedRoles = ["user", "reporter", "mla", "parshad", "opposition"];
-    const userRole = allowedRoles.includes(role) ? role : "user";
-
+    const allowed = ["user", "reporter", "mla", "parshad", "opposition"];
     const user = await User.create({
       name: name.trim(),
       phone,
       location: { city: city.trim(), ward: ward.trim(), pincode },
-      role: userRole,
+      role: allowed.includes(role) ? role : "user",
     });
 
     const token = generateToken(user._id);
-
-    res.status(201).json({
-      success: true,
-      token,
-      user,
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(201).json({ success: true, token, user });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
   }
 };
 
-// @desc    Get current user
-// @route   GET /api/auth/me
-// @access  Private
-const getMe = async (req, res) => {
-  res.status(200).json({ success: true, user: req.user });
-};
+const getMe = (req, res) => res.json({ success: true, user: req.user });
 
 module.exports = { sendOTP, verifyOTP, signup, getMe };

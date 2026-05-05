@@ -1,23 +1,14 @@
 const mongoose = require("mongoose");
 
 const otpSchema = new mongoose.Schema({
-  phone: {
-    type: String,
-    required: true,
-  },
-  otp: {
-    type: String,
-    required: true,
-  },
+  phone: { type: String, required: true },
+  otp: { type: String, required: true },
   expiresAt: {
     type: Date,
-    default: () => new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
-    index: { expires: 0 }, // TTL index - auto delete after expiry
+    default: () => new Date(Date.now() + 10 * 60 * 1000),
+    index: { expires: 0 },
   },
-  verified: {
-    type: Boolean,
-    default: false,
-  },
+  verified: { type: Boolean, default: false },
 });
 
 module.exports = mongoose.model("OTP", otpSchema);

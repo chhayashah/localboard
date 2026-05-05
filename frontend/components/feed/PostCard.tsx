@@ -1,120 +1,131 @@
-import React, { useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Pressable,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
-import { COLORS, SIZES } from "../../constants/theme";
+import React, { useState } from "react";
 import {
-  timeAgo,
-  formatCount,
-  parseContent,
-  getRoleConfig,
-} from "../../constants/helpers";
+  Alert,
+  Image,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { formatCount, timeAgo } from "../../constants/helpers";
+import { COLORS, SIZES } from "../../constants/theme";
+import { postsAPI } from "../../services/api";
 import Avatar from "../common/Avatar";
 import RoleBadge from "../common/RoleBadge";
-import { postsAPI } from "../../services/api";
 
-const SW = Dimensions.get("window").width;
-
-export default function PostCard({ post, onLikeUpdate, onPress }: any) {
+export default function PostCard({ post, onLikeUpdate, compact = false }: any) {
   const router = useRouter();
   const [liked, setLiked] = useState(post.isLiked);
-  const [likeCount, setLikeCount] = useState(
-    post.likeCount || post.likes?.length || 0,
-  );
+  const [likeCount, setLikeCount] = useState(post.likeCount || 0);
 
-  const handleLike = useCallback(async () => {
+  const handleLike = async () => {
     const prev = liked;
+    const prevC = likeCount;
     setLiked(!liked);
     setLikeCount((c: number) => (!liked ? c + 1 : c - 1));
+    onLikeUpdate?.(post._id, !liked, !liked ? likeCount + 1 : likeCount - 1);
     try {
-      const res: any = await postsAPI.likePost(post._id);
-      onLikeUpdate?.(post._id, res.isLiked, res.likeCount);
+      await postsAPI.likePost(post._id);
     } catch {
       setLiked(prev);
-      setLikeCount((c: number) => (prev ? c - 1 : c + 1));
+      setLikeCount(prevC);
     }
-  }, [liked, post._id]);
+  };
 
-  const rc = getRoleConfig(post.user?.role);
-  const isNews = post.type === "news";
-  const isUpdate = post.type === "update";
-  const parts = parseContent(post.content);
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `${post.content}\n\nLocalBoard pe dekho — Apna Sheher, Apni Awaaz`,
+      });
+      postsAPI.sharePost(post._id).catch(() => {});
+    } catch {}
+  };
+
+  const renderContent = (text: string) => {
+    const parts = text.split(/(#\w+|@\w+)/g);
+    return (
+      <Text style={styles.caption}>
+        {parts.map((p, i) =>
+          p.startsWith("#") ? (
+            <Text key={i} style={styles.hashtag}>
+              {p}
+            </Text>
+          ) : p.startsWith("@") ? (
+            <Text key={i} style={styles.mention}>
+              {p}
+            </Text>
+          ) : (
+            <Text key={i}>{p}</Text>
+          ),
+        )}
+      </Text>
+    );
+  };
+
+  const isNews = post.type === "news" || post.type === "update";
+  const isVideo = post.mediaType === "video" || post.type === "reel";
 
   return (
-    <Pressable
-      style={[
-        styles.card,
-        (isNews || isUpdate) && {
-          borderLeftWidth: 3,
-          borderLeftColor: isNews ? COLORS.roleReporter : COLORS.roleMla,
-        },
-      ]}
-      onPress={() =>
-        onPress ? onPress(post) : router.push(`/post/${post._id}`)
-      }
+    <TouchableOpacity
+      style={[styles.card, isNews && styles.newsCard]}
+      onPress={() => router.push(`/post/${post._id}`)}
+      activeOpacity={0.92}
     >
-      {/* Special banner */}
-      {(isNews || isUpdate) && (
-        <LinearGradient
-          colors={
-            isNews ? ["#3B82F620", "#3B82F605"] : ["#FF6B2B20", "#FF6B2B05"]
-          }
-          style={styles.banner}
+      {isNews && (
+        <View
+          style={[
+            styles.newsBanner,
+            {
+              backgroundColor:
+                (post.type === "update"
+                  ? COLORS.roleMla
+                  : COLORS.roleReporter) + "15",
+            },
+          ]}
         >
-          <Ionicons
-            name={isNews ? "newspaper" : "megaphone"}
-            size={12}
-            color={isNews ? COLORS.roleReporter : COLORS.roleMla}
-          />
           <Text
             style={[
               styles.bannerText,
-              { color: isNews ? COLORS.roleReporter : COLORS.roleMla },
+              {
+                color:
+                  post.type === "update" ? COLORS.roleMla : COLORS.roleReporter,
+              },
             ]}
           >
-            {isNews ? "NEWS" : "OFFICIAL UPDATE"}
+            {post.type === "update" ? "🏛️ Official Update" : "📰 Local News"}
           </Text>
-        </LinearGradient>
+        </View>
       )}
 
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.userRow}
           onPress={() => router.push(`/profile/${post.user?._id}`)}
         >
-          <Avatar user={post.user} size={40} />
+          <Avatar user={post.user} size={38} showBadge />
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={styles.name}>{post.user?.name}</Text>
-              {post.user?.isVerified && (
-                <Ionicons
-                  name="checkmark-circle"
-                  size={14}
-                  color={rc.color}
-                  style={{ marginLeft: 3 }}
-                />
-              )}
-            </View>
-            <View style={styles.meta}>
-              <RoleBadge role={post.user?.role} />
-              <Text style={styles.metaText}>
-                📍 {post.user?.location?.ward}
+            <View style={styles.nameRow}>
+              <Text style={styles.name} numberOfLines={1}>
+                {post.user?.name}
               </Text>
-              <Text style={styles.metaText}>{timeAgo(post.createdAt)}</Text>
+              <RoleBadge role={post.user?.role} />
             </View>
+            <Text style={styles.meta}>
+              📍 {post.user?.location?.ward} · {timeAgo(post.createdAt)}
+            </Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity>
+        <TouchableOpacity
+          onPress={() =>
+            Alert.alert("Options", "", [
+              { text: "Report", style: "destructive" },
+              { text: "Cancel", style: "cancel" },
+            ])
+          }
+        >
           <Ionicons
             name="ellipsis-horizontal"
             size={18}
@@ -123,179 +134,188 @@ export default function PostCard({ post, onLikeUpdate, onPress }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Content */}
-      {!!post.content && (
-        <Text style={styles.content} numberOfLines={4}>
-          {parts.map((p, i) => (
-            <Text
-              key={i}
-              style={
-                p.type === "hashtag"
-                  ? styles.hashtag
-                  : p.type === "mention"
-                    ? styles.mention
-                    : {}
-              }
-            >
-              {p.value}
-            </Text>
-          ))}
-        </Text>
-      )}
-
-      {/* Image */}
-      {post.mediaUrl && post.mediaType === "image" && (
-        <Image
-          source={{ uri: post.mediaUrl }}
-          style={styles.media}
-          resizeMode="cover"
-        />
-      )}
-
-      {/* Video */}
-      {post.mediaUrl && post.mediaType === "video" && (
-        <View>
+      {post.mediaUrl && !compact && (
+        <View style={styles.media}>
           <Image
             source={{ uri: post.mediaUrl }}
-            style={styles.media}
+            style={styles.mediaImg}
             resizeMode="cover"
           />
-          <View style={styles.playOverlay}>
-            <Ionicons
-              name="play-circle"
-              size={48}
-              color="rgba(255,255,255,0.9)"
-            />
+          {isVideo && (
+            <View style={styles.playBtn}>
+              <Ionicons name="play" size={28} color="#fff" />
+            </View>
+          )}
+          <View style={styles.mediaOverlay}>
+            {isVideo && (
+              <View style={styles.reelTag}>
+                <Ionicons name="play" size={9} color="#000" />
+                <Text style={styles.reelText}>REEL</Text>
+              </View>
+            )}
+            <Text style={styles.viewCount}>
+              👁 {formatCount(post.views || 0)}
+            </Text>
           </View>
         </View>
       )}
 
-      {/* Hashtag chips */}
-      {post.hashtags?.length > 0 && (
-        <View style={styles.tagRow}>
-          {post.hashtags.slice(0, 3).map((t: string, i: number) => (
-            <Text key={i} style={styles.tag}>
-              {t}
-            </Text>
-          ))}
-        </View>
+      {!!post.content && (
+        <View style={styles.body}>{renderContent(post.content)}</View>
       )}
 
-      {/* Actions */}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
+        <TouchableOpacity style={styles.action} onPress={handleLike}>
           <Ionicons
             name={liked ? "heart" : "heart-outline"}
-            size={22}
-            color={liked ? COLORS.error : COLORS.textSecondary}
+            size={20}
+            color={liked ? COLORS.error : COLORS.textMuted}
           />
-          <Text style={[styles.count, liked && { color: COLORS.error }]}>
+          <Text style={[styles.actionText, liked && { color: COLORS.error }]}>
             {formatCount(likeCount)}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.actionBtn}
+          style={styles.action}
           onPress={() => router.push(`/post/${post._id}`)}
         >
           <Ionicons
             name="chatbubble-outline"
-            size={21}
-            color={COLORS.textSecondary}
+            size={19}
+            color={COLORS.textMuted}
           />
-          <Text style={styles.count}>
-            {formatCount(post.commentCount || post.comments?.length || 0)}
+          <Text style={styles.actionText}>
+            {formatCount(post.commentCount || 0)}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn}>
+        <TouchableOpacity style={styles.action} onPress={handleShare}>
           <Ionicons
             name="arrow-redo-outline"
-            size={21}
-            color={COLORS.textSecondary}
+            size={19}
+            color={COLORS.textMuted}
           />
-          <Text style={styles.count}>{formatCount(post.shares || 0)}</Text>
+          <Text style={styles.actionText}>Share</Text>
+        </TouchableOpacity>
+        <View style={{ flex: 1 }} />
+        <TouchableOpacity>
+          <Ionicons
+            name="bookmark-outline"
+            size={19}
+            color={COLORS.textMuted}
+          />
         </TouchableOpacity>
       </View>
-    </Pressable>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.bgCard,
-    marginBottom: 8,
+    borderRadius: SIZES.radiusLg,
+    marginBottom: 10,
+    marginHorizontal: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: "hidden",
+  },
+  newsCard: { borderColor: COLORS.roleReporter + "30" },
+  newsBanner: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  banner: {
+  bannerText: {
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  header: { flexDirection: "row", alignItems: "center", padding: 12 },
+  userRow: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  nameRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: SIZES.md,
-    paddingVertical: 7,
+    marginBottom: 2,
+    flexWrap: "wrap",
   },
-  bannerText: { fontSize: 10, fontWeight: "800", letterSpacing: 1.2 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SIZES.md,
-    paddingVertical: 10,
-  },
-  userRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
   name: {
-    fontSize: SIZES.bodyLg,
+    fontSize: SIZES.body,
     fontWeight: "700",
     color: COLORS.textPrimary,
+    flexShrink: 1,
   },
-  meta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 2,
-    flexWrap: "wrap",
-  },
-  metaText: { fontSize: 11, color: COLORS.textMuted },
-  content: {
-    fontSize: SIZES.body,
-    color: COLORS.textPrimary,
-    lineHeight: 21,
-    paddingHorizontal: SIZES.md,
-    paddingBottom: 10,
-  },
-  hashtag: { color: COLORS.primary, fontWeight: "600" },
-  mention: { color: COLORS.secondary, fontWeight: "600" },
-  media: { width: "100%", height: SW * 0.65 },
-  playOverlay: {
-    ...StyleSheet.absoluteFillObject,
+  meta: { fontSize: SIZES.caption, color: COLORS.textMuted },
+  media: { width: "100%", height: 200, position: "relative" },
+  mediaImg: { width: "100%", height: "100%" },
+  playBtn: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: [{ translateX: -24 }, { translateY: -24 }],
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.25)",
   },
-  tagRow: {
+  mediaOverlay: {
+    position: "absolute",
+    bottom: 8,
+    left: 10,
+    right: 10,
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    paddingHorizontal: SIZES.md,
-    paddingVertical: 6,
+    justifyContent: "space-between",
+    alignItems: "flex-end",
   },
-  tag: {
-    fontSize: 12,
-    color: COLORS.primary,
-    backgroundColor: COLORS.primary + "15",
-    paddingHorizontal: 8,
+  reelTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: SIZES.radiusFull,
+    borderRadius: 5,
   },
+  reelText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#000",
+    letterSpacing: 0.5,
+  },
+  viewCount: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.85)",
+    fontWeight: "600",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
+  },
+  body: { paddingHorizontal: 12, paddingVertical: 8 },
+  caption: {
+    fontSize: SIZES.body,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+  },
+  hashtag: { color: COLORS.primary, fontWeight: "700" },
+  mention: { color: COLORS.info, fontWeight: "700" },
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: SIZES.md,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    gap: 20,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: 14,
   },
-  actionBtn: { flexDirection: "row", alignItems: "center", gap: 5 },
-  count: {
+  action: { flexDirection: "row", alignItems: "center", gap: 5 },
+  actionText: {
     fontSize: SIZES.caption,
-    color: COLORS.textSecondary,
-    fontWeight: "500",
+    color: COLORS.textMuted,
+    fontWeight: "600",
   },
 });

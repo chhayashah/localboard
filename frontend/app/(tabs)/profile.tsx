@@ -1,33 +1,31 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  Image,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  Dimensions,
-  Alert,
-} from "react-native";
-import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { COLORS, SIZES } from "../../constants/theme";
-import { usersAPI } from "../../services/api";
-import { useAuth } from "../../hooks/useAuth";
 import Avatar from "../../components/common/Avatar";
 import RoleBadge from "../../components/common/RoleBadge";
 import { formatCount, getRoleConfig } from "../../constants/helpers";
+import { COLORS, SIZES } from "../../constants/theme";
+import { useAuth } from "../../hooks/useAuth";
+import { usersAPI } from "../../services/api";
 
-const GRID = (Dimensions.get("window").width - 3) / 3;
+const GRID = (Dimensions.get("window").width - 6) / 3;
 
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user: me, logout } = useAuth();
-
   const [profile, setProfile] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
   const [stats, setStats] = useState({ posts: 0, followers: 0, following: 0 });
@@ -35,158 +33,166 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState("posts");
 
   useEffect(() => {
-    load();
-  }, []);
+    if (me?._id) load();
+  }, [me]);
 
   const load = async () => {
     try {
-      const res: any = await usersAPI.getProfile(me!._id);
+      const res: any = await usersAPI.getProfile(me._id);
       if (res.success) {
         setProfile(res.user);
         setPosts(res.posts);
         setStats(res.stats);
       }
-    } catch (e: any) {
-      Alert.alert("Error", e.message);
+    } catch {
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert("Logout", "Kya aap sure hain?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Logout", style: "destructive", onPress: logout },
-    ]);
-  };
+  const handleLogout = () => logout();
 
-  if (loading || !profile) {
+  if (loading || !profile)
     return (
-      <View style={styles.loader}>
+      <View style={[styles.loader, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
-  }
 
   const rc = getRoleConfig(profile.role);
   const filtered =
     activeTab === "reels" ? posts.filter((p) => p.type === "reel") : posts;
 
-  const Header = () => (
-    <View>
-      <LinearGradient
-        colors={[rc.color + "30", COLORS.bg]}
-        style={{ height: 130 }}
-      />
-
-      <View style={[styles.topBar, { top: insets.top + 8 }]}>
-        <View style={{ flex: 1 }} />
-        <TouchableOpacity
-          style={styles.topBtn}
-          onPress={() => router.push("/profile/edit")}
-        >
-          <Ionicons name="create-outline" size={20} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.topBtn} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color="#fff" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={{ paddingHorizontal: SIZES.screenPadding }}>
-        <View style={styles.avatarRow}>
-          <View style={styles.avatarBorder}>
-            <Avatar user={profile} size={80} />
-          </View>
-          <TouchableOpacity
-            style={styles.editBtn}
-            onPress={() => router.push("/profile/edit")}
-          >
-            <Text style={styles.editBtnText}>Profile Edit</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.name}>{profile.name}</Text>
-        <RoleBadge role={profile.role} size="lg" />
-        <Text style={styles.locationText}>
-          📍 {profile.location.ward}, {profile.location.city}
-        </Text>
-        {!!profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
-
-        <View style={styles.statsRow}>
-          {[
-            { label: "Posts", v: stats.posts },
-            { label: "Followers", v: stats.followers },
-            { label: "Following", v: stats.following },
-          ].map((s) => (
-            <View key={s.label} style={styles.statItem}>
-              <Text style={styles.statNum}>{formatCount(s.v)}</Text>
-              <Text style={styles.statLabel}>{s.label}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.tabBar}>
-        {[
-          { k: "posts", icon: "grid-outline" },
-          { k: "reels", icon: "play-circle-outline" },
-        ].map((t) => (
-          <TouchableOpacity
-            key={t.k}
-            style={[styles.tab, activeTab === t.k && styles.tabActive]}
-            onPress={() => setActiveTab(t.k)}
-          >
-            <Ionicons
-              name={t.icon as any}
-              size={22}
-              color={activeTab === t.k ? COLORS.primary : COLORS.textMuted}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item._id}
-        numColumns={3}
-        ListHeaderComponent={Header}
-        renderItem={({ item }) => (
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Banner */}
+        <LinearGradient
+          colors={[rc.color + "50", rc.color + "20", COLORS.bg]}
+          style={{ height: 120 }}
+        />
+
+        {/* Top nav */}
+        <View style={[styles.topNav, { top: insets.top + 8 }]}>
           <TouchableOpacity
-            style={{ width: GRID, height: GRID }}
-            onPress={() => router.push(`/post/${item._id}`)}
+            style={styles.navBtn}
+            onPress={() => router.push("/notifications")}
           >
-            {item.mediaUrl ? (
-              <Image
-                source={{ uri: item.mediaUrl }}
-                style={{ width: "100%", height: "100%", resizeMode: "cover" }}
+            <Ionicons
+              name="notifications-outline"
+              size={20}
+              color={COLORS.textPrimary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navBtn} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Profile info */}
+        <View style={styles.info}>
+          <View style={styles.avatarRow}>
+            <View style={styles.avatarBorder}>
+              <Avatar user={profile} size={80} showBadge />
+            </View>
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={() => router.push("/profile/edit")}
+            >
+              <Ionicons
+                name="pencil-outline"
+                size={14}
+                color={COLORS.textPrimary}
               />
-            ) : (
-              <View style={styles.textPost}>
-                <Text style={styles.textPostContent} numberOfLines={3}>
-                  {item.content}
+              <Text style={styles.editBtnText}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.name}>{profile.name}</Text>
+          <Text style={styles.handle}>
+            @{profile.name?.toLowerCase().replace(/ /g, "")} ·{" "}
+            {profile.location?.ward}
+          </Text>
+          <RoleBadge role={profile.role} size="lg" />
+          {!!profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
+
+          {/* Stats */}
+          <View style={styles.statsRow}>
+            {[
+              { label: "Posts", v: stats.posts },
+              { label: "Followers", v: stats.followers },
+              { label: "Following", v: stats.following },
+            ].map((s) => (
+              <View key={s.label} style={styles.stat}>
+                <Text style={styles.statNum}>{formatCount(s.v)}</Text>
+                <Text style={styles.statLabel}>{s.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Tabs */}
+        <View style={styles.tabBar}>
+          {[
+            { k: "posts", icon: "grid-outline" },
+            { k: "reels", icon: "play-circle-outline" },
+          ].map((t) => (
+            <TouchableOpacity
+              key={t.k}
+              style={[styles.tab, activeTab === t.k && styles.tabActive]}
+              onPress={() => setActiveTab(t.k)}
+            >
+              <Ionicons
+                name={t.icon as any}
+                size={22}
+                color={activeTab === t.k ? COLORS.primary : COLORS.textMuted}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Grid */}
+        <View style={styles.grid}>
+          {filtered.map((item) => (
+            <TouchableOpacity
+              key={item._id}
+              style={{ width: GRID, height: GRID }}
+              onPress={() => router.push(`/post/${item._id}`)}
+            >
+              {item.mediaUrl ? (
+                <Image
+                  source={{ uri: item.mediaUrl }}
+                  style={{ width: "100%", height: "100%", resizeMode: "cover" }}
+                />
+              ) : (
+                <View style={styles.textPost}>
+                  <Text style={styles.textPostContent} numberOfLines={4}>
+                    {item.content}
+                  </Text>
+                </View>
+              )}
+              {item.type === "reel" && (
+                <View style={styles.reelIcon}>
+                  <Ionicons name="play" size={11} color="#fff" />
+                </View>
+              )}
+              <View style={styles.likesOverlay}>
+                <Ionicons name="heart" size={10} color="#fff" />
+                <Text style={styles.likesCount}>
+                  {formatCount(item.likes?.length || 0)}
                 </Text>
               </View>
-            )}
-            {item.type === "reel" && (
-              <View style={styles.gridBadge}>
-                <Ionicons name="play" size={12} color="#fff" />
-              </View>
-            )}
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <View style={{ padding: 40, alignItems: "center" }}>
-            <Text style={{ color: COLORS.textMuted }}>Abhi koi post nahi</Text>
-          </View>
-        }
-        showsVerticalScrollIndicator={false}
-        columnWrapperStyle={{ gap: 1.5 }}
-        ItemSeparatorComponent={() => <View style={{ height: 1.5 }} />}
-      />
+            </TouchableOpacity>
+          ))}
+          {filtered.length === 0 && (
+            <View style={styles.emptyGrid}>
+              <Text style={{ color: COLORS.textMuted }}>
+                Koi post nahi abhi 🙂
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -198,51 +204,56 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  topBar: {
+  topNav: {
     position: "absolute",
-    left: 0,
-    right: 0,
+    right: 14,
     flexDirection: "row",
-    paddingHorizontal: SIZES.screenPadding,
+    gap: 8,
     zIndex: 10,
   },
-  topBtn: {
+  navBtn: {
     width: 36,
     height: 36,
+    backgroundColor: "rgba(0,0,0,0.5)",
     borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 8,
   },
+  info: { paddingHorizontal: 16, paddingBottom: 12, marginTop: -40 },
   avatarRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
     justifyContent: "space-between",
+    alignItems: "flex-end",
     marginBottom: 12,
-    marginTop: -44,
   },
   avatarBorder: { padding: 3, borderRadius: 50, backgroundColor: COLORS.bg },
   editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
     borderWidth: 1.5,
     borderColor: COLORS.border,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: SIZES.radiusFull,
   },
-  editBtnText: { color: COLORS.textPrimary, fontWeight: "600", fontSize: 13 },
+  editBtnText: {
+    color: COLORS.textPrimary,
+    fontWeight: "600",
+    fontSize: SIZES.body,
+  },
   name: {
-    fontSize: SIZES.heading,
+    fontSize: 22,
     fontWeight: "800",
     color: COLORS.textPrimary,
-    marginBottom: 5,
+    marginBottom: 3,
   },
-  locationText: { fontSize: 13, color: COLORS.textMuted, marginTop: 4 },
+  handle: { fontSize: 12, color: COLORS.textMuted, marginBottom: 6 },
   bio: {
-    fontSize: SIZES.body,
+    fontSize: 13,
     color: COLORS.textSecondary,
     lineHeight: 20,
-    marginTop: 6,
+    marginTop: 8,
   },
   statsRow: {
     flexDirection: "row",
@@ -253,13 +264,9 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     marginTop: 12,
   },
-  statItem: { alignItems: "center", gap: 2 },
-  statNum: {
-    fontSize: SIZES.title,
-    fontWeight: "800",
-    color: COLORS.textPrimary,
-  },
-  statLabel: { fontSize: 12, color: COLORS.textMuted },
+  stat: { alignItems: "center", gap: 2 },
+  statNum: { fontSize: 20, fontWeight: "800", color: COLORS.textPrimary },
+  statLabel: { fontSize: 11, color: COLORS.textMuted },
   tabBar: {
     flexDirection: "row",
     borderBottomWidth: 1,
@@ -273,6 +280,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "transparent",
   },
   tabActive: { borderBottomColor: COLORS.primary },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 2, padding: 2 },
   textPost: {
     width: "100%",
     height: "100%",
@@ -281,15 +289,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   textPostContent: { fontSize: 10, color: COLORS.textSecondary },
-  gridBadge: {
+  reelIcon: {
     position: "absolute",
     top: 5,
     right: 5,
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.65)",
     justifyContent: "center",
     alignItems: "center",
   },
+  likesOverlay: {
+    position: "absolute",
+    bottom: 4,
+    left: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  likesCount: { fontSize: 8, color: "#fff", fontWeight: "700" },
+  emptyGrid: { width: "100%", padding: 40, alignItems: "center" },
 });

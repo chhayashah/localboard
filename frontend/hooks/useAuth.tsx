@@ -1,106 +1,83 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
+  useCallback,
   useContext,
-  useState,
   useEffect,
-  ReactNode,
+  useState,
 } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { authAPI } from "../services/api";
 
-interface User {
-  _id: string;
-  name: string;
-  phone: string;
-  avatar?: string;
-  bio?: string;
-  role: string;
-  isVerified: boolean;
-  location: { city: string; ward: string; pincode: string };
-  postCount: number;
-}
-
-interface AuthContextType {
-  user: User | null;
-  token: string | null;
-  loading: boolean;
+interface AuthCtx {
+  user: any | null;
   isAuthenticated: boolean;
-  saveAuth: (token: string, user: User) => Promise<void>;
-  updateUser: (user: User) => Promise<void>;
+  loading: boolean;
+  saveAuth: (token: string, user: any) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (user: any) => void;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthCtx>({
+  user: null,
+  isAuthenticated: false,
+  loading: true,
+  saveAuth: async () => {},
+  logout: async () => {},
+  updateUser: () => {},
+});
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadAuth();
+    restore();
   }, []);
 
-  const loadAuth = async () => {
+  const restore = async () => {
     try {
-      const [[, t], [, u]] = await AsyncStorage.multiGet(["token", "user"]);
-      if (t && u) {
-        setToken(t);
-        setUser(JSON.parse(u));
-        try {
-          const res: any = await authAPI.getMe();
-          if (res.success) {
-            setUser(res.user);
-            await AsyncStorage.setItem("user", JSON.stringify(res.user));
-          }
-        } catch {
-          await clearAll();
-        }
-      }
+      const token = await AsyncStorage.getItem("token");
+      if (!token) return;
+      const res: any = await authAPI.getMe();
+      if (res.success) setUser(res.user);
+      else await AsyncStorage.multiRemove(["token", "user"]);
+    } catch {
+      await AsyncStorage.multiRemove(["token", "user"]);
     } finally {
       setLoading(false);
     }
   };
 
-  const saveAuth = async (newToken: string, newUser: User) => {
-    await AsyncStorage.multiSet([
-      ["token", newToken],
-      ["user", JSON.stringify(newUser)],
-    ]);
-    setToken(newToken);
-    setUser(newUser);
-  };
+  const saveAuth = useCallback(async (token: string, userData: any) => {
+    await AsyncStorage.setItem("token", token);
+    await AsyncStorage.setItem("user", JSON.stringify(userData));
+    setUser(userData);
+  }, []);
 
-  const clearAll = async () => {
+  const logout = useCallback(async () => {
     await AsyncStorage.multiRemove(["token", "user"]);
-    setToken(null);
     setUser(null);
-  };
+  }, []);
 
-  const updateUser = async (updated: User) => {
-    setUser(updated);
-    await AsyncStorage.setItem("user", JSON.stringify(updated));
-  };
+  const updateUser = useCallback((u: any) => {
+    setUser(u);
+    AsyncStorage.setItem("user", JSON.stringify(u));
+  }, []);
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        token,
+        isAuthenticated: !!user,
         loading,
-        isAuthenticated: !!token && !!user,
         saveAuth,
+        logout,
         updateUser,
-        logout: clearAll,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be inside AuthProvider");
-  return ctx;
-};
+export const useAuth = () => useContext(AuthContext);

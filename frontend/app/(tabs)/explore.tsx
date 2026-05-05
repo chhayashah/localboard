@@ -1,112 +1,199 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Avatar from "../../components/common/Avatar";
+import RoleBadge from "../../components/common/RoleBadge";
+import { formatCount } from "../../constants/helpers";
+import { COLORS, SIZES } from "../../constants/theme";
+import { usersAPI } from "../../services/api";
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+const TRENDING_TAGS = [
+  "#JabalpurVibes",
+  "#Ward12",
+  "#LocalJobs",
+  "#NapierTown",
+  "#LocalMeme",
+  "#NaliRepair",
+];
 
-export default function TabTwoScreen() {
+export default function ExploreScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [search, setSearch] = useState("");
+  const [users, setUsers] = useState<any[]>([]);
+  const [leaders, setLeaders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  useEffect(() => {
+    loadLeaders();
+  }, []);
+
+  const loadLeaders = async () => {
+    try {
+      const res: any = await usersAPI.getLocalLeaders();
+      if (res.success) setLeaders(res.leaders);
+    } catch {}
+  };
+
+  const handleSearch = async () => {
+    if (!search.trim()) return;
+    setLoading(true);
+    setSearched(true);
+    try {
+      const res: any = await usersAPI.searchUsers(search);
+      if (res.success) setUsers(res.users);
+    } catch {
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const UserRow = ({ item }: any) => (
+    <TouchableOpacity
+      style={styles.userCard}
+      onPress={() => router.push(`/profile/${item._id}`)}
+    >
+      <Avatar user={item} size={46} showBadge />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.userName}>{item.name}</Text>
+        <Text style={styles.userMeta}>
+          📍 {item.location?.ward} · {formatCount(item.followers?.length || 0)}{" "}
+          followers
+        </Text>
+      </View>
+      <RoleBadge role={item.role} size="md" />
+    </TouchableOpacity>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>🔍 Explore</Text>
+      </View>
+
+      {/* Search */}
+      <View style={styles.searchBar}>
+        <Ionicons name="search-outline" size={16} color={COLORS.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Creator, ward, topic dhundo..."
+          placeholderTextColor={COLORS.textMuted}
+          value={search}
+          onChangeText={setSearch}
+          onSubmitEditing={handleSearch}
+          returnKeyType="search"
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+        <TouchableOpacity onPress={handleSearch}>
+          <Text style={styles.searchBtn}>Dhundo</Text>
+        </TouchableOpacity>
+      </View>
+
+      <FlatList
+        data={searched ? users : leaders}
+        keyExtractor={(item) => item._id}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={() => (
+          <View>
+            {/* Trending tags */}
+            <Text style={styles.sectionLabel}>🔥 Trending Tags</Text>
+            <View style={styles.tagsRow}>
+              {TRENDING_TAGS.map((t) => (
+                <TouchableOpacity key={t} style={styles.tag}>
+                  <Text style={styles.tagText}>{t}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.sectionLabel}>
+              {searched
+                ? `Results for "${search}"`
+                : "🏅 Local Leaders & Creators"}
+            </Text>
+          </View>
+        )}
+        renderItem={({ item }) => <UserRow item={item} />}
+        contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator color={COLORS.primary} style={{ padding: 30 }} />
+          ) : searched ? (
+            <View style={styles.empty}>
+              <Text style={{ color: COLORS.textMuted }}>Koi nahi mila 😕</Text>
+            </View>
+          ) : null
+        }
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
-  },
-  titleContainer: {
-    flexDirection: 'row',
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  header: { paddingHorizontal: 16, paddingVertical: 12 },
+  title: { fontSize: 22, fontWeight: "800", color: COLORS.textPrimary },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
+    marginHorizontal: 14,
+    marginBottom: 12,
+    backgroundColor: COLORS.bgInput,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
+  searchInput: { flex: 1, fontSize: 13, color: COLORS.textPrimary },
+  searchBtn: { fontSize: 12, fontWeight: "700", color: COLORS.primary },
+  list: { paddingHorizontal: 14, paddingBottom: 30 },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: COLORS.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 18 },
+  tag: {
+    backgroundColor: COLORS.primary + "12",
+    borderRadius: SIZES.radiusFull,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: COLORS.primary + "30",
+  },
+  tagText: { fontSize: 12, fontWeight: "700", color: COLORS.primary },
+  userCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: COLORS.bgCard,
+    borderRadius: SIZES.radiusMd,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 10,
+  },
+  userName: {
+    fontSize: SIZES.body,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+    marginBottom: 3,
+  },
+  userMeta: { fontSize: SIZES.caption, color: COLORS.textMuted },
+  empty: { padding: 40, alignItems: "center" },
 });

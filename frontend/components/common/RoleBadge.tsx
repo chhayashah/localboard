@@ -1,29 +1,34 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { SIZES } from "../../constants/theme";
+import { StyleSheet, Text, View } from "react-native";
 import { getRoleConfig } from "../../constants/helpers";
+import { SIZES } from "../../constants/theme";
 
-export default function RoleBadge({
-  role,
-  size = "sm",
-}: {
+interface Props {
   role: string;
-  size?: "sm" | "lg";
-}) {
-  const c = getRoleConfig(role);
-  if (role === "user") return null;
-  const fs = size === "lg" ? 12 : 10;
+  size?: "sm" | "md" | "lg";
+}
+
+export default function RoleBadge({ role, size = "sm" }: Props) {
+  if (!role || role === "user") return null;
+  const config = getRoleConfig(role);
+  const fontSize = size === "lg" ? 10 : size === "md" ? 9 : 8;
+  const px = size === "lg" ? 9 : 7;
+  const py = size === "lg" ? 4 : 2;
+
   return (
     <View
       style={[
         styles.badge,
-        { backgroundColor: c.color + "22", borderColor: c.color + "44" },
+        {
+          paddingHorizontal: px,
+          paddingVertical: py,
+          backgroundColor: config.color + "20",
+          borderColor: config.color + "40",
+        },
       ]}
     >
-      <Ionicons name={c.icon as any} size={fs} color={c.color} />
-      <Text style={[styles.label, { color: c.color, fontSize: fs }]}>
-        {c.label}
+      <Text style={[styles.text, { fontSize, color: config.color }]}>
+        {config.emoji} {config.label}
       </Text>
     </View>
   );
@@ -31,13 +36,9 @@ export default function RoleBadge({
 
 const styles = StyleSheet.create({
   badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: SIZES.radiusFull,
+    borderRadius: SIZES.radiusSm,
     borderWidth: 1,
+    alignSelf: "flex-start",
   },
-  label: { fontWeight: "600" },
+  text: { fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
 });
