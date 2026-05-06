@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.100:5000/api";
+  process.env.EXPO_PUBLIC_API_URL || "http://192.168.0.121:5000/api";
 
 const request = async (
   method: string,
