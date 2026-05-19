@@ -1,9 +1,6 @@
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
-const cors = require("cors");
-const helmet = require("helmet");
-const morgan = require("morgan");
 require("dotenv").config();
 
 const connectDB = require("./config/db");
@@ -11,29 +8,25 @@ const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
-});
 
 connectDB();
 
-// Middleware
-app.use(helmet({ crossOriginResourcePolicy: false }));
-
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: false,
-  }),
-);
-
-app.options("*", cors());
+// ✅ CORS — sabse pehle, kuch bhi aane se pehle
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+  );
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+});
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
-if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
 
 // Routes
 app.use("/api/auth", require("./routes/authRoutes"));
@@ -48,19 +41,19 @@ app.get("/api/health", (req, res) =>
 app.use(errorHandler);
 
 // Socket.io
+const io = new Server(server, {
+  cors: { origin: "*", methods: ["GET", "POST"] },
+});
+
 const wardRooms = new Map();
 io.on("connection", (socket) => {
-  const { userId, ward } = socket.handshake.query;
-  console.log(`🔌 Connected: ${socket.id} | Ward: ${ward}`);
+  const { ward } = socket.handshake.query;
   if (ward) {
     socket.join(`ward:${ward}`);
     if (!wardRooms.has(ward)) wardRooms.set(ward, new Set());
     wardRooms.get(ward).add(socket.id);
     io.to(`ward:${ward}`).emit("ward_count", wardRooms.get(ward).size);
   }
-  socket.on("new_post", (post) => {
-    socket.to(`ward:${post.location?.ward}`).emit("post_created", post);
-  });
   socket.on("disconnect", () => {
     if (ward && wardRooms.has(ward)) {
       wardRooms.get(ward).delete(socket.id);

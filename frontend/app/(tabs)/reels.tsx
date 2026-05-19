@@ -1,53 +1,59 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+  View, Text, FlatList, TouchableOpacity,
+  StyleSheet, Dimensions, ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { Video, ResizeMode } from "expo-av";
+import { LinearGradient } from "expo-linear-gradient";
+import { COLORS, SIZES } from "../../constants/theme";
+import { postsAPI } from "../../services/api";
+import { useAuth } from "../../hooks/useAuth";
 import Avatar from "../../components/common/Avatar";
 import { formatCount, timeAgo } from "../../constants/helpers";
-import { COLORS } from "../../constants/theme";
-import { postsAPI } from "../../services/api";
 
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
 
+// ─── Single Reel Item ─────────────────────────────────────────
 function ReelItem({ item, isActive }: { item: any; isActive: boolean }) {
-  const router = useRouter();
-  const [liked, setLiked] = useState(item.isLiked);
-  const [likeCount, setLikeCount] = useState(item.likeCount || 0);
+  const router  = useRouter();
+  const videoRef = useRef<Video>(null);
+  const [liked,     setLiked]     = useState(item.isLiked || false);
+  const [likeCount, setLikeCount] = useState(item.likeCount || item.likes?.length || 0);
+  const [muted,     setMuted]     = useState(false);
+  const [paused,    setPaused]    = useState(false);
+
+  // Play/pause when active changes
+  useEffect(() => {
+    if (!videoRef.current) return;
+    if (isActive && !paused) {
+      videoRef.current.playAsync();
+    } else {
+      videoRef.current.pauseAsync();
+    }
+  }, [isActive, paused]);
 
   const handleLike = async () => {
     setLiked(!liked);
-    setLikeCount((c: number) => (!liked ? c + 1 : c - 1));
-    try {
-      await postsAPI.likePost(item._id);
-    } catch {}
+    setLikeCount((c: number) => !liked ? c + 1 : c - 1);
+    try { await postsAPI.likePost(item._id); } catch {}
   };
 
-  const renderContent = (text: string) => {
+  const togglePause = () => setPaused((p) => !p);
+  const toggleMute  = () => setMuted((m) => !m);
+
+  const renderCaption = (text: string) => {
     if (!text) return null;
     const parts = text.split(/(#\w+|@\w+)/g);
     return (
-      <Text style={styles.caption}>
+      <Text style={styles.caption} numberOfLines={3}>
         {parts.map((p, i) =>
-          p.startsWith("#") ? (
-            <Text key={i} style={{ color: COLORS.primary, fontWeight: "700" }}>
-              {p}
-            </Text>
-          ) : p.startsWith("@") ? (
-            <Text key={i} style={{ color: COLORS.info, fontWeight: "700" }}>
-              {p}
-            </Text>
-          ) : (
-            <Text key={i}>{p}</Text>
-          ),
+          p.startsWith("#") ? <Text key={i} style={{ color: COLORS.primary, fontWeight: "700" }}>{p}</Text>
+          : p.startsWith("@") ? <Text key={i} style={{ color: COLORS.info, fontWeight: "700" }}>{p}</Text>
+          : <Text key={i}>{p}</Text>
         )}
       </Text>
     );
@@ -55,76 +61,125 @@ function ReelItem({ item, isActive }: { item: any; isActive: boolean }) {
 
   return (
     <View style={styles.reelItem}>
-      {/* Background */}
-      <View style={styles.reelBg}>
-        <Text style={{ fontSize: 80, opacity: 0.18 }}>🎬</Text>
+
+      {/* ── Video / Image Background ── */}
+      <TouchableOpacity
+        activeOpacity={1}
+        style={StyleSheet.absoluteFill}
+        onPress={togglePause}
+      >
+        {item.mediaUrl ? (
+          item.mediaType === "video" || item.type === "reel" ? (
+            <Video
+              ref={videoRef}
+              source={{ uri: item.mediaUrl }}
+              style={StyleSheet.absoluteFill}
+              resizeMode={ResizeMode.COVER}
+              isLooping
+              isMuted={muted}
+              shouldPlay={isActive && !paused}
+            />
+          ) : (
+            // Image reel fallback
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: "#0a0020" }]}>
+              <View style={styles.imgPlaceholder}>
+                <Text style={{ fontSize: 60 }}>🎬</Text>
+              </View>
+            </View>
+          )
+        ) : (
+          <LinearGradient
+            colors={["#0a0020", "#1a0840", "#300a15"]}
+            style={StyleSheet.absoluteFill}
+          >
+            <View style={styles.imgPlaceholder}>
+              <Text style={{ fontSize: 60, opacity: 0.4 }}>🎬</Text>
+            </View>
+          </LinearGradient>
+        )}
+      </TouchableOpacity>
+
+      {/* ── Pause Icon ── */}
+      {paused && (
+        <View style={styles.pauseIcon}>
+          <Ionicons name="pause" size={50} color="rgba(255,255,255,0.8)" />
+        </View>
+      )}
+
+      {/* ── Top Bar ── */}
+      <View style={styles.topBar}>
+        <View style={styles.wardTag}>
+          <View style={styles.wardDot} />
+          <Text style={styles.wardText}>📍 {item.user?.location?.ward}</Text>
+        </View>
+        <TouchableOpacity style={styles.muteBtn} onPress={toggleMute}>
+          <Ionicons
+            name={muted ? "volume-mute" : "volume-high"}
+            size={18} color="#fff"
+          />
+        </TouchableOpacity>
       </View>
 
-      {/* Ward tag */}
-      <View style={styles.wardTag}>
-        <View style={styles.wardDot} />
-        <Text style={styles.wardText}>📍 {item.user?.location?.ward}</Text>
-      </View>
-
-      {/* Progress bar */}
-      <View style={styles.progressBar}>
-        <View
-          style={[styles.progressFill, isActive && styles.progressActive]}
-        />
-      </View>
-
-      {/* Right actions */}
+      {/* ── Right Actions ── */}
       <View style={styles.rightActions}>
+        {/* Avatar */}
         <TouchableOpacity
-          style={styles.actionBtn}
+          style={styles.avatarWrap}
           onPress={() => router.push(`/profile/${item.user?._id}`)}
         >
-          <Avatar user={item.user} size={42} showBadge />
+          <Avatar user={item.user} size={44} showBadge />
           <View style={styles.followPill}>
-            <Text style={styles.followText}>+</Text>
+            <Ionicons name="add" size={12} color="#000" />
           </View>
         </TouchableOpacity>
 
+        {/* Like */}
         <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
-          <View style={styles.actionCircle}>
+          <View style={[styles.actionCircle, liked && { backgroundColor: COLORS.error + "30" }]}>
             <Ionicons
               name={liked ? "heart" : "heart-outline"}
-              size={24}
+              size={26}
               color={liked ? COLORS.error : "#fff"}
             />
           </View>
           <Text style={styles.actionLabel}>{formatCount(likeCount)}</Text>
         </TouchableOpacity>
 
+        {/* Comment */}
         <TouchableOpacity
           style={styles.actionBtn}
           onPress={() => router.push(`/post/${item._id}`)}
         >
           <View style={styles.actionCircle}>
-            <Ionicons name="chatbubble-outline" size={22} color="#fff" />
+            <Ionicons name="chatbubble-outline" size={24} color="#fff" />
           </View>
           <Text style={styles.actionLabel}>
-            {formatCount(item.commentCount || 0)}
+            {formatCount(item.commentCount || item.comments?.length || 0)}
           </Text>
         </TouchableOpacity>
 
+        {/* Share */}
         <TouchableOpacity style={styles.actionBtn}>
           <View style={styles.actionCircle}>
-            <Ionicons name="arrow-redo-outline" size={22} color="#fff" />
+            <Ionicons name="arrow-redo-outline" size={24} color="#fff" />
           </View>
           <Text style={styles.actionLabel}>Share</Text>
         </TouchableOpacity>
 
+        {/* Save */}
         <TouchableOpacity style={styles.actionBtn}>
           <View style={styles.actionCircle}>
-            <Ionicons name="bookmark-outline" size={22} color="#fff" />
+            <Ionicons name="bookmark-outline" size={24} color="#fff" />
           </View>
           <Text style={styles.actionLabel}>Save</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Bottom info */}
-      <View style={styles.bottomInfo}>
+      {/* ── Bottom Info ── */}
+      <LinearGradient
+        colors={["transparent", "rgba(0,0,0,0.85)"]}
+        style={styles.bottomGrad}
+      >
         <TouchableOpacity
           style={styles.userRow}
           onPress={() => router.push(`/profile/${item.user?._id}`)}
@@ -132,67 +187,113 @@ function ReelItem({ item, isActive }: { item: any; isActive: boolean }) {
           <Text style={styles.userName}>
             @{item.user?.name?.toLowerCase().replace(/ /g, "")}
           </Text>
-          <Text style={styles.userTime}> · {timeAgo(item.createdAt)}</Text>
+          <Text style={styles.dot}> · </Text>
+          <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
         </TouchableOpacity>
-        {!!item.content && renderContent(item.content)}
-        <View style={styles.hashtagRow}>
-          {(item.hashtags || []).slice(0, 3).map((h: string) => (
-            <Text key={h} style={styles.hashtag}>
-              {h}
-            </Text>
-          ))}
+
+        {!!item.content && renderCaption(item.content)}
+
+        {/* Hashtags */}
+        {item.hashtags?.length > 0 && (
+          <View style={styles.hashtagRow}>
+            {item.hashtags.slice(0, 4).map((h: string) => (
+              <Text key={h} style={styles.hashtag}>{h}</Text>
+            ))}
+          </View>
+        )}
+
+        {/* Music bar */}
+        <View style={styles.musicBar}>
+          <Ionicons name="musical-notes" size={13} color={COLORS.primary} />
+          <Text style={styles.musicText} numberOfLines={1}>
+            {item.user?.location?.city} Local Beat 🎵
+          </Text>
         </View>
+      </LinearGradient>
+    </View>
+  );
+}
+
+// ─── Empty State ──────────────────────────────────────────────
+function EmptyReels({ onUpload }: { onUpload: () => void }) {
+  return (
+    <View style={styles.emptyWrap}>
+      <LinearGradient
+        colors={["#0a0020", "#1a0840"]}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.emptyContent}>
+        <Text style={styles.emptyEmoji}>🎬</Text>
+        <Text style={styles.emptyTitle}>No Reels Yet</Text>
+        <Text style={styles.emptySub}>
+          Be the first to share a reel{"\n"}from your ward!
+        </Text>
+        <TouchableOpacity style={styles.uploadBtn} onPress={onUpload}>
+          <Ionicons name="videocam" size={18} color="#000" />
+          <Text style={styles.uploadBtnText}>Upload First Reel</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
+// ─── Main Screen ──────────────────────────────────────────────
 export default function ReelsScreen() {
-  const insets = useSafeAreaInsets();
-  const [reels, setReels] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const router       = useRouter();
+  const insets       = useSafeAreaInsets();
+  const { user }     = useAuth();
+  const [reels,      setReels]      = useState<any[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeIndex,setActiveIndex]= useState(0);
 
-  useEffect(() => {
-    loadReels();
-  }, []);
+  useEffect(() => { loadReels(); }, []);
 
   const loadReels = async () => {
     try {
       const res: any = await postsAPI.getReels(1);
       if (res.success) setReels(res.reels);
-    } catch {
-    } finally {
-      setLoading(false);
-    }
+    } catch {}
+    finally { setLoading(false); setRefreshing(false); }
   };
 
   const onViewableChanged = useCallback(({ viewableItems }: any) => {
-    if (viewableItems[0]) setActiveIndex(viewableItems[0].index);
+    if (viewableItems[0] != null) setActiveIndex(viewableItems[0].index ?? 0);
   }, []);
 
-  if (loading)
-    return (
-      <View style={[styles.loader, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+  const viewConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
-  if (reels.length === 0)
-    return (
-      <View style={[styles.loader, { paddingTop: insets.top }]}>
-        <Text style={{ fontSize: 40 }}>🎬</Text>
-        <Text style={{ color: COLORS.textMuted, marginTop: 12, fontSize: 15 }}>
-          Koi reel nahi abhi
-        </Text>
-        <Text style={{ color: COLORS.textMuted, fontSize: 12, marginTop: 4 }}>
-          Pehle reel upload karo!
-        </Text>
-      </View>
-    );
+  if (loading) return (
+    <View style={[styles.loader, { paddingTop: insets.top }]}>
+      <ActivityIndicator size="large" color={COLORS.primary} />
+      <Text style={{ color: COLORS.textMuted, marginTop: 12 }}>Loading reels...</Text>
+    </View>
+  );
+
+  if (reels.length === 0) return (
+    <View style={{ flex: 1 }}>
+      <EmptyReels onUpload={() => router.push("/create")} />
+
+      {/* Upload FAB */}
+      <TouchableOpacity
+        style={[styles.fab, { top: insets.top + 10 }]}
+        onPress={() => router.push("/create")}
+      >
+        <Ionicons name="add" size={22} color="#000" />
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
+      {/* Upload button */}
+      <TouchableOpacity
+        style={[styles.fab, { top: insets.top + 10 }]}
+        onPress={() => router.push("/create")}
+      >
+        <Ionicons name="add" size={22} color="#000" />
+      </TouchableOpacity>
+
       <FlatList
         data={reels}
         keyExtractor={(item) => item._id}
@@ -202,108 +303,55 @@ export default function ReelsScreen() {
         pagingEnabled
         showsVerticalScrollIndicator={false}
         snapToInterval={SCREEN_H}
+        snapToAlignment="start"
         decelerationRate="fast"
         onViewableItemsChanged={onViewableChanged}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
+        viewabilityConfig={viewConfig}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); loadReels(); }}
+            tintColor={COLORS.primary}
+          />
+        }
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
-  loader: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  reelItem: { width: SCREEN_W, height: SCREEN_H, position: "relative" },
-  reelBg: {
-    position: "absolute",
-    inset: 0,
-    backgroundColor: "#0a0020",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  wardTag: {
-    position: "absolute",
-    top: 55,
-    left: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "rgba(245,166,35,0.22)",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "rgba(245,166,35,0.3)",
-  },
-  wardDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: COLORS.primary,
-  },
-  wardText: { fontSize: 10, color: COLORS.primary, fontWeight: "700" },
-  progressBar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 2.5,
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-  progressFill: {
-    height: "100%",
-    width: "0%",
-    backgroundColor: COLORS.primary,
-    borderRadius: 2,
-  },
-  progressActive: { width: "45%" },
-  rightActions: { position: "absolute", right: 12, bottom: 100, gap: 20 },
-  actionBtn: { alignItems: "center", gap: 4 },
-  actionCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    backdropFilter: "blur(10px)",
-  },
-  actionLabel: {
-    fontSize: 10,
-    color: "rgba(255,255,255,0.8)",
-    fontWeight: "700",
-  },
-  followPill: {
-    position: "absolute",
-    bottom: -4,
-    right: -4,
-    width: 18,
-    height: 18,
-    backgroundColor: COLORS.primary,
-    borderRadius: 5,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#000",
-  },
-  followText: { fontSize: 11, color: "#000", fontWeight: "900" },
-  bottomInfo: { position: "absolute", bottom: 90, left: 14, right: 70 },
-  userRow: { flexDirection: "row", alignItems: "center", marginBottom: 7 },
-  userName: { fontSize: 13, fontWeight: "800", color: "#fff" },
-  userTime: { fontSize: 10, color: "rgba(255,255,255,0.5)" },
-  caption: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.85)",
-    lineHeight: 18,
-    marginBottom: 7,
-  },
-  hashtagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  hashtag: { fontSize: 11, color: "rgba(245,166,35,0.9)", fontWeight: "700" },
+  container:    { flex: 1, backgroundColor: "#000" },
+  loader:       { flex: 1, backgroundColor: COLORS.bg, justifyContent: "center", alignItems: "center" },
+  reelItem:     { width: SCREEN_W, height: SCREEN_H, position: "relative", backgroundColor: "#000" },
+  imgPlaceholder:{ flex: 1, justifyContent: "center", alignItems: "center" },
+  pauseIcon:    { position: "absolute", top: "50%", left: "50%", transform: [{ translateX: -30 }, { translateY: -30 }], zIndex: 10 },
+  topBar:       { position: "absolute", top: 55, left: 0, right: 0, flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14 },
+  wardTag:      { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(245,166,35,0.2)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: "rgba(245,166,35,0.3)" },
+  wardDot:      { width: 5, height: 5, borderRadius: 3, backgroundColor: COLORS.primary },
+  wardText:     { fontSize: 11, color: COLORS.primary, fontWeight: "700" },
+  muteBtn:      { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+  rightActions: { position: "absolute", right: 12, bottom: 120, gap: 20, alignItems: "center" },
+  avatarWrap:   { position: "relative", marginBottom: 4 },
+  followPill:   { position: "absolute", bottom: -6, left: "50%", transform: [{ translateX: -10 }], width: 20, height: 20, backgroundColor: COLORS.primary, borderRadius: 10, justifyContent: "center", alignItems: "center", borderWidth: 1.5, borderColor: "#000" },
+  actionBtn:    { alignItems: "center", gap: 4 },
+  actionCircle: { width: 46, height: 46, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
+  actionLabel:  { fontSize: 11, color: "rgba(255,255,255,0.85)", fontWeight: "700" },
+  bottomGrad:   { position: "absolute", bottom: 0, left: 0, right: 0, paddingHorizontal: 14, paddingBottom: 90, paddingTop: 40 },
+  userRow:      { flexDirection: "row", alignItems: "center", marginBottom: 6 },
+  userName:     { fontSize: 14, fontWeight: "800", color: "#fff" },
+  dot:          { color: "rgba(255,255,255,0.4)", fontSize: 12 },
+  timeText:     { fontSize: 11, color: "rgba(255,255,255,0.5)" },
+  caption:      { fontSize: 13, color: "rgba(255,255,255,0.9)", lineHeight: 19, marginBottom: 8 },
+  hashtagRow:   { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 },
+  hashtag:      { fontSize: 12, color: "rgba(245,166,35,0.9)", fontWeight: "700" },
+  musicBar:     { flexDirection: "row", alignItems: "center", gap: 6 },
+  musicText:    { fontSize: 12, color: "rgba(255,255,255,0.7)", flex: 1 },
+  emptyWrap:    { flex: 1, justifyContent: "center", alignItems: "center" },
+  emptyContent: { alignItems: "center", gap: 12, padding: 32 },
+  emptyEmoji:   { fontSize: 64, marginBottom: 8 },
+  emptyTitle:   { fontSize: 24, fontWeight: "800", color: COLORS.textPrimary },
+  emptySub:     { fontSize: 14, color: COLORS.textMuted, textAlign: "center", lineHeight: 22 },
+  uploadBtn:    { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: COLORS.primary, paddingHorizontal: 24, paddingVertical: 13, borderRadius: SIZES.radiusFull, marginTop: 8 },
+  uploadBtnText:{ fontSize: 15, fontWeight: "800", color: "#000" },
+  fab:          { position: "absolute", right: 14, zIndex: 10, width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primary, justifyContent: "center", alignItems: "center", shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
 });

@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { toast } from "../../components/common/Toast";
 import { isValidEmail, isValidPhone } from "../../constants/helpers";
 import { COLORS } from "../../constants/theme";
 import { useAuth } from "../../hooks/useAuth";
@@ -40,39 +40,49 @@ export default function LoginScreen() {
     }, 1000);
   };
 
+  // handleSendOTP mein
   const handleSendOTP = async () => {
-    if (!isValidPhone(phone) && !isValidEmail(phone))
-      return Alert.alert("Invalid", "Sahi phone number ya email daalo");
+    if (!isValidPhone(phone) && !isValidEmail(phone)) {
+      toast.warning("⚠️ Enter a valid phone number or email.");
+      return;
+    }
     setLoading(true);
     try {
       const res: any = await authAPI.sendOTP(phone);
       if (res.success) {
         setStep("otp");
         startTimer();
-        if (res.otp) Alert.alert("Dev Mode OTP", res.otp);
+        toast.info("📱 OTP sent successfully!");
+        if (res.otp) toast.info(`🔑 Dev OTP: ${res.otp}`, { autoClose: 10000 });
       }
     } catch (e: any) {
-      Alert.alert("Error", e.message);
+      toast.error("❌ " + e.message);
     } finally {
       setLoading(false);
     }
   };
 
+  // handleVerifyOTP mein
   const handleVerifyOTP = async () => {
-    if (otp.length < 6) return Alert.alert("Invalid", "6-digit OTP daalo");
+    if (otp.length < 6) {
+      toast.warning("⚠️ Enter 6-digit OTP.");
+      return;
+    }
     setLoading(true);
     try {
       const res: any = await authAPI.verifyOTP(phone, otp);
       if (res.success) {
         if (res.isNewUser) {
+          toast.success("✅ OTP Verified! Complete your profile.");
           router.push({ pathname: "/auth/signup", params: { phone } });
         } else {
           await saveAuth(res.token, res.user);
+          toast.success("🎉 Welcome back to LocalBoard!");
           router.replace("/(tabs)");
         }
       }
     } catch (e: any) {
-      Alert.alert("Wrong OTP", e.message);
+      toast.error("❌ " + e.message);
     } finally {
       setLoading(false);
     }

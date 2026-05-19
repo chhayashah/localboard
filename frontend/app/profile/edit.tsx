@@ -16,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { toast } from "../../components/common/Toast";
 import Avatar from "../../components/common/Avatar";
 import { COLORS, SIZES } from "../../constants/theme";
 import { useAuth } from "../../hooks/useAuth";
@@ -69,9 +70,8 @@ export default function EditProfileScreen() {
       const res: any = await usersAPI.updateProfile(fd);
       if (res.success) {
         updateUser(res.user);
-        Alert.alert("✅ Saved!", "Profile update ho gaya", [
-          { text: "OK", onPress: () => router.back() },
-        ]);
+        toast.success("✅ Profile updated successfully!");
+        setTimeout(() => router.back(), 1500);
       }
     } catch (e: any) {
       Alert.alert("Error", e.message);

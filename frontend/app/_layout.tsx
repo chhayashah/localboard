@@ -1,9 +1,11 @@
-import { Stack, useRouter, useSegments } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
-import { COLORS } from "../constants/theme";
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "../hooks/useAuth";
+import { View, ActivityIndicator } from "react-native";
+import { useRouter, useSegments } from "expo-router";
+import { COLORS } from "../constants/theme";
+import { ToastContainer } from "../components/common/Toast";
 
 function RootLayoutNav() {
   const { isAuthenticated, loading } = useAuth();
@@ -17,39 +19,34 @@ function RootLayoutNav() {
     if (isAuthenticated && inAuth) router.replace("/(tabs)");
   }, [isAuthenticated, loading]);
 
-  if (loading)
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: COLORS.bg,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+  if (loading) return (
+    <View style={{ flex: 1, backgroundColor: COLORS.bg, justifyContent: "center", alignItems: "center" }}>
+      <ActivityIndicator size="large" color={COLORS.primary} />
+    </View>
+  );
 
   return (
-    <Stack
-      screenOptions={{
+    <View style={{ flex: 1 }}>
+      <Stack screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: COLORS.bg },
         animation: "slide_from_right",
-      }}
-    >
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="auth/login" />
-      <Stack.Screen name="auth/signup" />
-      <Stack.Screen name="post/[id]" />
-      <Stack.Screen name="profile/[id]" />
-      <Stack.Screen name="profile/edit" />
-      <Stack.Screen name="jobs/[id]" />
-      <Stack.Screen name="jobs/create" />
-      <Stack.Screen name="create" />
-      <Stack.Screen name="notifications" />
-    </Stack>
+      }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="auth/login" />
+        <Stack.Screen name="auth/signup" />
+        <Stack.Screen name="post/[id]" />
+        <Stack.Screen name="profile/[id]" />
+        <Stack.Screen name="profile/edit" />
+        <Stack.Screen name="jobs/[id]" />
+        <Stack.Screen name="jobs/create" />
+        <Stack.Screen name="create" />
+        <Stack.Screen name="notifications" />
+      </Stack>
+
+      {/* ✅ Global Toast — har screen ke upar */}
+      <ToastContainer />
+    </View>
   );
 }
 
