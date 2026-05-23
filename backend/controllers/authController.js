@@ -88,28 +88,46 @@ const verifyOTP = async (req, res) => {
 
 const signup = async (req, res) => {
   try {
-    const { phone, name, city, ward, pincode, role } = req.body;
-    if (!phone || !name || !city || !ward || !pincode)
-      return res
-        .status(400)
-        .json({ success: false, message: "All fields required" });
+    console.log("Signup body:", req.body);
 
-    if (await User.findOne({ phone }))
-      return res
-        .status(400)
-        .json({ success: false, message: "User already exists" });
+    const { phone, name, city, ward, pincode, role } = req.body;
+
+    if (!phone || !name || !city || !ward || !pincode) {
+      const missing = [];
+      if (!phone) missing.push("phone");
+      if (!name) missing.push("name");
+      if (!city) missing.push("city");
+      if (!ward) missing.push("ward");
+      if (!pincode) missing.push("pincode");
+      return res.status(400).json({
+        success: false,
+        message: `Missing: ${missing.join(", ")}`,
+      });
+    }
+
+    if (await User.findOne({ phone })) {
+      return res.status(400).json({
+        success: false,
+        message: "Account already exists. Please login.",
+      });
+    }
 
     const allowed = ["user", "reporter", "mla", "parshad", "opposition"];
     const user = await User.create({
       name: name.trim(),
       phone,
-      location: { city: city.trim(), ward: ward.trim(), pincode },
+      location: {
+        city: city.trim(),
+        ward: ward.trim(),
+        pincode: pincode.toString(),
+      },
       role: allowed.includes(role) ? role : "user",
     });
 
     const token = generateToken(user._id);
     res.status(201).json({ success: true, token, user });
   } catch (e) {
+    console.error("Signup error:", e.message);
     res.status(500).json({ success: false, message: e.message });
   }
 };

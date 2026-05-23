@@ -1,16 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -23,66 +20,132 @@ import { toast } from "../../components/common/Toast";
 
 const STEPS = [
   {
+    key: "phone",
+    title: "Your phone number?",
+    sub: "We'll send an OTP to verify.",
+    placeholder: "9876543210",
+    emoji: "📱",
+    keyboard: "phone-pad" as const,
+    max: 10,
+  },
+  {
     key: "name",
     title: "What's your name?",
     sub: "This is how you'll appear on LocalBoard.",
+    placeholder: "e.g. Ramesh Kumar",
+    emoji: "👤",
+    keyboard: "default" as const,
+    max: 50,
   },
   {
     key: "ward",
     title: "Your ward or area?",
     sub: "We'll show you content from your neighborhood.",
+    placeholder: "e.g. Ward 12, Napier Town",
+    emoji: "📍",
+    keyboard: "default" as const,
+    max: 80,
   },
   {
     key: "city",
     title: "Which city?",
     sub: "Helps us find local content near you.",
+    placeholder: "e.g. Jabalpur",
+    emoji: "🏙️",
+    keyboard: "default" as const,
+    max: 50,
   },
   {
     key: "pincode",
     title: "Your pincode?",
     sub: "6-digit pincode for precise local matching.",
+    placeholder: "e.g. 482001",
+    emoji: "📮",
+    keyboard: "number-pad" as const,
+    max: 6,
   },
 ];
 
 export default function SignupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const params = useLocalSearchParams<{ phone: string }>();
   const { saveAuth } = useAuth();
 
-  const [step, setStep] = useState(0);
+  // If phone came from OTP login, skip phone step
+  const phoneFromLogin = params.phone || "";
+  const startStep = phoneFromLogin ? 1 : 0;
+
+  const [step, setStep] = useState(startStep);
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
+    phone: phoneFromLogin,
     name: "",
     ward: "",
     city: "",
     pincode: "",
   });
-  const [loading, setLoading] = useState(false);
+
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => inputRef.current?.focus(), 150);
+    return () => clearTimeout(t);
+  }, [step]);
+
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  const currentStep = STEPS[step];
+  // Steps to show — skip phone step if came from OTP
+  const visibleSteps = phoneFromLogin ? STEPS.slice(1) : STEPS;
+  const currentStep = visibleSteps[step];
   const currentVal = form[currentStep.key as keyof typeof form];
-  const progress = (step / STEPS.length) * 100;
+  const totalSteps = visibleSteps.length;
+  const progress = ((step + 1) / totalSteps) * 100;
 
   const handleNext = async () => {
+    // Validate
     if (!currentVal.trim()) {
       toast.warning(`Please enter your ${currentStep.key}.`);
+      inputRef.current?.focus();
       return;
     }
     if (currentStep.key === "pincode" && currentVal.length !== 6) {
       toast.warning("Enter a valid 6-digit pincode.");
+      inputRef.current?.focus();
+      return;
+    }
+    if (currentStep.key === "phone" && !/^[6-9]\d{9}$/.test(currentVal)) {
+      toast.warning("Enter a valid 10-digit Indian phone number.");
+      inputRef.current?.focus();
       return;
     }
 
-    if (step < STEPS.length - 1) {
+    // Not last step
+    if (step < totalSteps - 1) {
       setStep((s) => s + 1);
       return;
     }
 
-    // Final step — submit
+    // Last step — submit
     setLoading(true);
     try {
-      const res: any = await authAPI.signup({ phone, ...form });
+      const payload = {
+        phone: form.phone.trim(),
+        name: form.name.trim(),
+        ward: form.ward.trim(),
+        city: form.city.trim(),
+        pincode: form.pincode.trim(),
+      };
+
+      console.log("Submitting signup:", payload);
+
+      if (!payload.phone) {
+        toast.error("Phone number is missing. Please go back and try again.");
+        setLoading(false);
+        return;
+      }
+
+      const res: any = await authAPI.signup(payload);
       if (res.success) {
         await saveAuth(res.token, res.user);
         toast.success("🎉 Welcome to LocalBoard!");
@@ -105,151 +168,132 @@ export default function SignupScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1, backgroundColor: COLORS.bg }}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={[styles.container, { paddingTop: insets.top + 10 }]}>
-          {/* ── Header ── */}
-          <View style={styles.header}>
-            <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
-              <Ionicons
-                name="arrow-back"
-                size={20}
-                color={COLORS.textPrimary}
+      <View style={[styles.container, { paddingTop: insets.top + 14 }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
+            <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
+          </TouchableOpacity>
+          <View style={styles.progressWrap}>
+            <View style={styles.progressTrack}>
+              <View
+                style={[styles.progressFill, { width: `${progress}%` as any }]}
               />
-            </TouchableOpacity>
-            <View style={styles.progressWrap}>
-              <View style={styles.progressTrack}>
-                <View
-                  style={[styles.progressFill, { width: `${progress + 25}%` }]}
-                />
-              </View>
-              <Text style={styles.progressLabel}>
-                {step + 1} of {STEPS.length}
-              </Text>
             </View>
-          </View>
-
-          {/* ── Content ── */}
-          <View style={styles.content}>
-            {/* Step indicator dots */}
-            <View style={styles.dots}>
-              {STEPS.map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.dot,
-                    i === step && styles.dotActive,
-                    i < step && styles.dotDone,
-                  ]}
-                />
-              ))}
-            </View>
-
-            {/* Icon */}
-            <View style={styles.stepIcon}>
-              <Text style={{ fontSize: 36 }}>
-                {["👤", "📍", "🏙️", "📮"][step]}
-              </Text>
-            </View>
-
-            <Text style={styles.stepTitle}>{currentStep.title}</Text>
-            <Text style={styles.stepSub}>{currentStep.sub}</Text>
-
-            {/* Input */}
-            <View style={styles.inputWrap}>
-              <TextInput
-                style={styles.input}
-                placeholder={
-                  [
-                    "Ramesh Kumar",
-                    "Ward 12 / Napier Town",
-                    "Jabalpur",
-                    "482001",
-                  ][step]
-                }
-                placeholderTextColor={COLORS.textMuted}
-                value={currentVal}
-                onChangeText={(v) => set(currentStep.key, v)}
-                keyboardType={
-                  currentStep.key === "pincode" ? "number-pad" : "default"
-                }
-                maxLength={currentStep.key === "pincode" ? 6 : 50}
-                autoCapitalize={
-                  currentStep.key === "pincode" ? "none" : "words"
-                }
-                autoFocus
-                onSubmitEditing={handleNext}
-                returnKeyType={step < STEPS.length - 1 ? "next" : "done"}
-              />
-              {currentVal.length > 0 && (
-                <TouchableOpacity
-                  style={styles.clearBtn}
-                  onPress={() => set(currentStep.key, "")}
-                >
-                  <Ionicons
-                    name="close-circle"
-                    size={18}
-                    color={COLORS.textMuted}
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Filled values */}
-            {step > 0 && (
-              <View style={styles.filledList}>
-                {STEPS.slice(0, step).map((s) => (
-                  <View key={s.key} style={styles.filledItem}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={15}
-                      color={COLORS.success}
-                    />
-                    <Text style={styles.filledKey}>{s.key}:</Text>
-                    <Text style={styles.filledVal}>
-                      {form[s.key as keyof typeof form]}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* ── CTA ── */}
-          <View style={[styles.bottom, { paddingBottom: insets.bottom + 16 }]}>
-            <TouchableOpacity
-              style={[styles.nextBtn, loading && { opacity: 0.6 }]}
-              onPress={handleNext}
-              disabled={loading}
-            >
-              <LinearGradient
-                colors={[COLORS.primary, COLORS.secondary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.nextBtnGrad}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#000" />
-                ) : (
-                  <>
-                    <Text style={styles.nextBtnText}>
-                      {step < STEPS.length - 1
-                        ? "Continue"
-                        : "Join LocalBoard 🚀"}
-                    </Text>
-                    <Ionicons
-                      name={
-                        step < STEPS.length - 1 ? "arrow-forward" : "checkmark"
-                      }
-                      size={18}
-                      color="#000"
-                    />
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+            <Text style={styles.progressText}>
+              Step {step + 1} of {totalSteps}
+            </Text>
           </View>
         </View>
-      </TouchableWithoutFeedback>
+
+        {/* Dots */}
+        <View style={styles.dotsRow}>
+          {visibleSteps.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.dot,
+                i === step && styles.dotActive,
+                i < step && styles.dotDone,
+              ]}
+            />
+          ))}
+        </View>
+
+        {/* Content */}
+        <View style={styles.content}>
+          <View style={styles.emojiBox}>
+            <Text style={{ fontSize: 38 }}>{currentStep.emoji}</Text>
+          </View>
+
+          <Text style={styles.stepTitle}>{currentStep.title}</Text>
+          <Text style={styles.stepSub}>{currentStep.sub}</Text>
+
+          {/* Input */}
+          <TextInput
+            ref={inputRef}
+            style={styles.input}
+            placeholder={currentStep.placeholder}
+            placeholderTextColor={COLORS.textMuted}
+            value={currentVal}
+            onChangeText={(v) => set(currentStep.key, v)}
+            keyboardType={currentStep.keyboard}
+            maxLength={currentStep.max}
+            autoCapitalize={
+              currentStep.key === "pincode" || currentStep.key === "phone"
+                ? "none"
+                : "words"
+            }
+            returnKeyType={step < totalSteps - 1 ? "next" : "done"}
+            onSubmitEditing={handleNext}
+            editable={!loading}
+          />
+
+          {/* Completed fields summary */}
+          {step > 0 && (
+            <View style={styles.summaryBox}>
+              {visibleSteps.slice(0, step).map((s) => (
+                <View key={s.key} style={styles.summaryRow}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={15}
+                    color={COLORS.success}
+                  />
+                  <Text style={styles.summaryKey}>{s.key}:</Text>
+                  <Text style={styles.summaryVal} numberOfLines={1}>
+                    {form[s.key as keyof typeof form]}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setStep(visibleSteps.findIndex((x) => x.key === s.key))
+                    }
+                  >
+                    <Text style={styles.editLink}>Edit</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* CTA */}
+        <View style={[styles.bottom, { paddingBottom: insets.bottom + 20 }]}>
+          <TouchableOpacity
+            onPress={handleNext}
+            disabled={loading}
+            style={[styles.nextBtn, loading && { opacity: 0.6 }]}
+          >
+            <LinearGradient
+              colors={[COLORS.primary, COLORS.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.nextBtnGrad}
+            >
+              {loading ? (
+                <ActivityIndicator color="#000" size="small" />
+              ) : (
+                <>
+                  <Text style={styles.nextBtnText}>
+                    {step < totalSteps - 1 ? "Continue" : "Join LocalBoard 🚀"}
+                  </Text>
+                  <Ionicons
+                    name={
+                      step < totalSteps - 1
+                        ? "arrow-forward"
+                        : "checkmark-circle"
+                    }
+                    size={20}
+                    color="#000"
+                  />
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+          <Text style={styles.footerNote}>
+            By joining, you agree to our Terms & Privacy Policy
+          </Text>
+        </View>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -259,9 +303,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 12,
     paddingHorizontal: 18,
-    paddingBottom: 10,
+    marginBottom: 20,
   },
   backBtn: {
     width: 40,
@@ -272,31 +316,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: COLORS.border,
+    flexShrink: 0,
   },
-  progressWrap: { flex: 1, gap: 5 },
+  progressWrap: { flex: 1, gap: 6 },
   progressTrack: {
-    height: 4,
+    height: 5,
     backgroundColor: COLORS.bgInput,
-    borderRadius: 2,
+    borderRadius: 3,
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
     backgroundColor: COLORS.primary,
-    borderRadius: 2,
+    borderRadius: 3,
   },
-  progressLabel: { fontSize: 11, color: COLORS.textMuted, fontWeight: "600" },
-  content: { flex: 1, paddingHorizontal: 24, paddingTop: 30 },
-  dots: { flexDirection: "row", gap: 7, marginBottom: 28 },
+  progressText: { fontSize: 11, color: COLORS.textMuted, fontWeight: "600" },
+  dotsRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 22,
+    marginBottom: 32,
+  },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: COLORS.bgInput,
   },
-  dotActive: { width: 24, backgroundColor: COLORS.primary },
+  dotActive: { width: 28, backgroundColor: COLORS.primary, borderRadius: 4 },
   dotDone: { backgroundColor: COLORS.success },
-  stepIcon: {
+  content: { flex: 1, paddingHorizontal: 22 },
+  emojiBox: {
     width: 72,
     height: 72,
     borderRadius: 22,
@@ -305,56 +355,65 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1.5,
     borderColor: COLORS.primary + "25",
-    marginBottom: 20,
+    marginBottom: 22,
   },
   stepTitle: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: "800",
     color: COLORS.textPrimary,
+    letterSpacing: -0.5,
     marginBottom: 6,
-    letterSpacing: -0.3,
   },
   stepSub: {
     fontSize: 14,
     color: COLORS.textMuted,
     lineHeight: 21,
-    marginBottom: 28,
+    marginBottom: 24,
   },
-  inputWrap: {
-    flexDirection: "row",
-    alignItems: "center",
+  input: {
+    width: "100%",
     backgroundColor: COLORS.bgCard,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: COLORS.border,
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  input: {
-    flex: 1,
+    borderColor: COLORS.primary + "40",
+    paddingHorizontal: 18,
+    paddingVertical: 18,
     fontSize: 18,
     color: COLORS.textPrimary,
-    paddingVertical: 16,
     fontWeight: "600",
+    marginBottom: 16,
   },
-  clearBtn: { padding: 4 },
-  filledList: { gap: 7 },
-  filledItem: { flexDirection: "row", alignItems: "center", gap: 7 },
-  filledKey: {
+  summaryBox: {
+    backgroundColor: COLORS.bgCard,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 10,
+  },
+  summaryRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  summaryKey: {
     fontSize: 12,
     color: COLORS.textMuted,
     fontWeight: "700",
     textTransform: "capitalize",
   },
-  filledVal: { fontSize: 12, color: COLORS.textSecondary, fontWeight: "600" },
-  bottom: { paddingHorizontal: 22 },
+  summaryVal: {
+    fontSize: 13,
+    color: COLORS.textPrimary,
+    fontWeight: "600",
+    flex: 1,
+  },
+  editLink: { fontSize: 11, color: COLORS.primary, fontWeight: "700" },
+  bottom: { paddingHorizontal: 22, gap: 12 },
   nextBtn: { borderRadius: 16, overflow: "hidden" },
   nextBtnGrad: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingVertical: 17,
+    gap: 10,
+    paddingVertical: 18,
   },
   nextBtnText: { fontSize: 17, fontWeight: "800", color: "#000" },
+  footerNote: { fontSize: 11, color: COLORS.textMuted, textAlign: "center" },
 });
