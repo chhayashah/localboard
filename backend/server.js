@@ -34,9 +34,7 @@ app.use("/api/posts", require("./routes/postRoutes"));
 app.use("/api/jobs", require("./routes/jobRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 
-app.get("/api/health", (req, res) =>
-  res.json({ status: "ok", app: "LocalBoard" }),
-);
+app.get("/api/health", (req, res) => res.json({ status: "ok", app: "GrowUp" }));
 
 app.use(errorHandler);
 

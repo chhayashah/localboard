@@ -22,11 +22,43 @@ transporter.verify((error, success) => {
   }
 });
 
+const sendOTPSms = async (phone, otp) => {
+  try {
+    const response = await fetch("https://control.msg91.com/api/v5/otp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        authkey: process.env.MSG91_AUTH_KEY,
+      },
+      body: JSON.stringify({
+        template_id: process.env.MSG91_TEMPLATE_ID,
+        mobile: `91${phone}`,
+        otp: otp,
+      }),
+    });
+
+    const data = await response.json();
+    console.log("MSG91 response:", data);
+
+    if (data.type === "success") {
+      console.log(`✅ OTP SMS sent to ${phone}`);
+      return true;
+    } else {
+      throw new Error(data.message || "SMS failed");
+    }
+  } catch (e) {
+    console.error("❌ SMS OTP failed:", e.message);
+    throw e;
+  }
+};
+
+module.exports = { sendOTPSms };
+
 const sendOTPEmail = async (email, otp) => {
   const mailOptions = {
-    from: `"LocalBoard 🏙️" <${process.env.EMAIL_USER}>`,
+    from: `"GrowUp 🏙️" <${process.env.EMAIL_USER}>`,
     to: email,
-    subject: `${otp} — Aapka LocalBoard OTP`,
+    subject: `${otp} — Aapka GrowUp OTP`,
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:auto;
                   background:#09090F;color:#F1F3FF;border-radius:16px;overflow:hidden;">

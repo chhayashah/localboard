@@ -2,6 +2,8 @@ const Post = require("../models/Post");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 
+const { uploadToCloudinary } = require("../config/cloudinary");
+
 const createPost = async (req, res) => {
   try {
     const { content, type } = req.body;
@@ -25,12 +27,29 @@ const createPost = async (req, res) => {
       isVerifiedPost: ["reporter", "mla", "parshad"].includes(user.role),
     };
 
-    if (req.file && process.env.CLOUDINARY_CLOUD_NAME !== "dummy") {
-      data.mediaUrl = req.file.path;
-      data.mediaType = req.file.mimetype?.startsWith("video/")
-        ? "video"
-        : "image";
-      if (data.mediaType === "video") data.type = "reel";
+    // Upload to Cloudinary if file exists
+    if (req.file) {
+      try {
+        console.log("📤 Uploading to Cloudinary:", req.file.path);
+        const result = await uploadToCloudinary(
+          req.file.path,
+          req.file.mimetype,
+        );
+        data.mediaUrl = result.secure_url;
+        data.mediaType = req.file.mimetype.startsWith("video/")
+          ? "video"
+          : "image";
+        if (data.mediaType === "video") data.type = "reel";
+        console.log("✅ Cloudinary upload success:", result.secure_url);
+      } catch (uploadErr) {
+        console.error("❌ Cloudinary upload failed:", uploadErr.message);
+        return res
+          .status(500)
+          .json({
+            success: false,
+            message: "Media upload failed: " + uploadErr.message,
+          });
+      }
     }
 
     const post = await Post.create(data);
@@ -39,6 +58,7 @@ const createPost = async (req, res) => {
 
     res.status(201).json({ success: true, post });
   } catch (e) {
+    console.error("Create post error:", e);
     res.status(500).json({ success: false, message: e.message });
   }
 };

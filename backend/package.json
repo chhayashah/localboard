@@ -1,5 +1,6 @@
 {
-  "name": "localboard-backend",
+  "name": "growup-backend",
+  "description": "GrowUp — Hyperlocal Social Platform Backend",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {

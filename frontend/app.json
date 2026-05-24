@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "LocalBoard",
-    "slug": "localboard",
+    "name": "GrowUp",
+    "slug": "growup",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "localboard",
+    "scheme": "growup",
     "userInterfaceStyle": "dark",
     "icon": "./assets/images/icon.png",
     "splash": {
@@ -12,22 +12,19 @@
       "resizeMode": "contain",
       "backgroundColor": "#09090F"
     },
-    "ios": { "supportsTablet": false },
+    "ios": { "supportsTablet": false, "bundleIdentifier": "com.growup.app" },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#09090F"
       },
-      "package": "com.localboard.app"
+      "package": "com.growup.app"
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "LocalBoard ko photos access chahiye post karne ke liye"
-        }
-      ]
+      ["expo-image-picker", {
+        "photosPermission": "GrowUp needs photo access to share posts"
+      }]
     ],
     "experiments": { "typedRoutes": true }
   }

@@ -148,7 +148,7 @@ export default function SignupScreen() {
       const res: any = await authAPI.signup(payload);
       if (res.success) {
         await saveAuth(res.token, res.user);
-        toast.success("🎉 Welcome to LocalBoard!");
+        toast.success("🎉 Welcome to GrowUp!");
         router.replace("/(tabs)");
       }
     } catch (e: any) {
@@ -274,7 +274,7 @@ export default function SignupScreen() {
               ) : (
                 <>
                   <Text style={styles.nextBtnText}>
-                    {step < totalSteps - 1 ? "Continue" : "Join LocalBoard 🚀"}
+                    {step < totalSteps - 1 ? "Continue" : "Join GrowUp 🚀"}
                   </Text>
                   <Ionicons
                     name={

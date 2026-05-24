@@ -37,6 +37,8 @@ const getUserProfile = async (req, res) => {
   }
 };
 
+const { uploadToCloudinary } = require("../config/cloudinary");
+
 const updateProfile = async (req, res) => {
   try {
     const { name, bio, city, ward, pincode } = req.body;
@@ -50,7 +52,21 @@ const updateProfile = async (req, res) => {
         pincode: pincode || req.user.location.pincode,
       };
     }
-    if (req.file) update.avatar = req.file.path;
+
+    // Upload avatar to Cloudinary
+    if (req.file) {
+      try {
+        const result = await uploadToCloudinary(
+          req.file.path,
+          req.file.mimetype,
+        );
+        update.avatar = result.secure_url;
+        console.log("✅ Avatar uploaded:", result.secure_url);
+      } catch (err) {
+        console.error("❌ Avatar upload failed:", err.message);
+      }
+    }
+
     const user = await User.findByIdAndUpdate(req.user._id, update, {
       new: true,
       runValidators: true,

@@ -13,13 +13,15 @@ const sendOTP = async (req, res) => {
     if (!phone)
       return res
         .status(400)
-        .json({ success: false, message: "Phone or email required" });
+        .json({ success: false, message: "Phone required" });
 
     const isEmail = phone.includes("@");
-    if (!isEmail && !/^[6-9]\d{9}$/.test(phone))
+    const isPhone = /^[6-9]\d{9}$/.test(phone);
+
+    if (!isEmail && !isPhone)
       return res
         .status(400)
-        .json({ success: false, message: "Valid Indian phone required" });
+        .json({ success: false, message: "Valid phone or email required" });
 
     await OTP.deleteMany({ phone });
 
@@ -31,17 +33,23 @@ const sendOTP = async (req, res) => {
     await OTP.create({ phone, otp });
     console.log(`📱 OTP for ${phone}: ${otp}`);
 
-    if (isEmail && process.env.MOCK_OTP !== "true") {
-      const { sendOTPEmail } = require("../utils/emailService");
-      await sendOTPEmail(phone, otp);
+    if (process.env.MOCK_OTP !== "true") {
+      if (isPhone) {
+        const { sendOTPSms } = require("../utils/smsService");
+        await sendOTPSms(phone, otp);
+      } else if (isEmail) {
+        const { sendOTPEmail } = require("../utils/emailService");
+        await sendOTPEmail(phone, otp);
+      }
     }
 
     res.json({
       success: true,
-      message: "OTP sent",
+      message: isPhone ? "OTP sent via SMS" : "OTP sent to email",
       ...(process.env.MOCK_OTP === "true" && { otp }),
     });
   } catch (e) {
+    console.error("Send OTP error:", e.message);
     res.status(500).json({ success: false, message: e.message });
   }
 };

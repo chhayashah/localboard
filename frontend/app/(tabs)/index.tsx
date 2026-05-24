@@ -157,8 +157,8 @@ export default function HomeScreen() {
       {/* App Header */}
       <View style={styles.appHdr}>
         <Text style={styles.wordmark}>
-          <Text style={{ color: COLORS.textPrimary }}>Local</Text>
-          <Text style={{ color: COLORS.primary }}>Board</Text>
+          <Text style={{ color: COLORS.textPrimary }}>Grow</Text>
+          <Text style={{ color: COLORS.primary }}>Up</Text>
         </Text>
         <View style={styles.hdrIcons}>
           <TouchableOpacity

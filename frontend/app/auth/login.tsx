@@ -134,8 +134,8 @@ export default function LoginScreen() {
             <Text style={{ fontSize: 36 }}>🏙️</Text>
           </View>
           <Text style={styles.logoText}>
-            <Text style={{ color: "#fff" }}>Local</Text>
-            <Text style={{ color: COLORS.primary }}>Board</Text>
+            <Text style={{ color: "#fff" }}>Grow</Text>
+            <Text style={{ color: COLORS.primary }}>Up</Text>
           </Text>
           <Text style={styles.logoTagline}>Apna Sheher. Apni Awaaz.</Text>
         </View>

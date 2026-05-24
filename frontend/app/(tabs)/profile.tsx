@@ -19,6 +19,7 @@ import { usersAPI } from "../../services/api";
 import Avatar from "../../components/common/Avatar";
 import RoleBadge from "../../components/common/RoleBadge";
 import { formatCount, getRoleConfig } from "../../constants/helpers";
+import { toast } from "../../components/common/Toast";
 
 const GRID_SIZE = (Dimensions.get("window").width - 4) / 3;
 
@@ -139,7 +140,13 @@ export default function ProfileScreen() {
                 color={COLORS.textPrimary}
               />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.bannerBtn} onPress={logout}>
+            <TouchableOpacity
+              style={styles.bannerBtn}
+              onPress={async () => {
+                toast.success("See you soon on GrowUp! 👋");
+                setTimeout(() => logout(), 1500);
+              }}
+            >
               <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
             </TouchableOpacity>
           </View>

@@ -228,8 +228,9 @@ export default function JobsScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>
-            <Text style={{ color: COLORS.textPrimary }}>Local</Text>
-            <Text style={{ color: COLORS.primary }}>Jobs</Text>
+            <Text style={{ color: COLORS.textPrimary }}>Grow</Text>
+            <Text style={{ color: COLORS.primary }}>Up</Text>
+            <Text style={{ color: COLORS.textPrimary }}> Jobs</Text>
           </Text>
           <Text style={styles.headerSub}>
             {user?.location?.ward}, {user?.location?.city}
